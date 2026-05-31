@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Database Connection — seamless_data</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f5f6fa;
+    }
+
+    /* ── layout ── */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #1a1a2e;
+      color: #c8cfe8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 32px;
+      height: 52px;
+    }
+    .navbar-brand { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: #7b8ab8; margin-right: 16px; white-space: nowrap; }
+    .navbar a  { padding: 6px 12px; border-radius: 6px; color: #c8cfe8; text-decoration: none; font-size: 14px; white-space: nowrap; }
+    .navbar a:hover, .navbar a.active { background: #2d2f6b; color: #fff; }
+
+    main { padding: 48px 56px; max-width: 960px; margin: 0 auto; }
+
+    /* ── typography ── */
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 40px 0 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e6f0; }
+    h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: #2d2f6b; }
+    p  { margin-bottom: 12px; color: #3a3d5c; }
+
+    /* ── badge ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+    .badge-ssh    { background: #e0e7ff; color: #3730a3; }
+    .badge-direct { background: #d1fae5; color: #065f46; }
+    .badge-req    { background: #fef3c7; color: #92400e; }
+    .badge-opt    { background: #f3f4f6; color: #6b7280; }
+
+    /* ── table ── */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+    thead tr { background: #1a1a2e; color: #fff; }
+    thead th { padding: 10px 14px; text-align: left; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #eef0f8; }
+    tbody tr:hover { background: #dde2f3; }
+    td { padding: 9px 14px; border-bottom: 1px solid #e2e6f0; vertical-align: top; }
+    td code { background: #f0f2fc; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── code block ── */
+    pre {
+      background: #1e2030;
+      color: #cdd6f4;
+      padding: 20px 24px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: 13.5px;
+      line-height: 1.6;
+      margin: 12px 0 24px;
+    }
+    pre .cm  { color: #6c7086; }
+    pre .kw  { color: #cba6f7; }
+    pre .str { color: #a6e3a1; }
+    pre .var { color: #89dceb; }
+    pre .fn  { color: #89b4fa; }
+    pre .val { color: #fab387; }
+
+    /* ── callout ── */
+    .callout {
+      display: flex;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin: 16px 0 24px;
+      font-size: 14px;
+    }
+    .callout-info    { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .callout-warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .callout-tip     { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .callout-icon    { font-size: 18px; line-height: 1.4; }
+    .callout-body    { color: #374151; }
+
+    /* ── mode card ── */
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 28px; }
+    .mode-card {
+      border-radius: 10px;
+      padding: 20px;
+      border: 2px solid transparent;
+    }
+    .mode-card.ssh    { background: #eef2ff; border-color: #818cf8; }
+    .mode-card.direct { background: #ecfdf5; border-color: #34d399; }
+    .mode-card h3     { margin: 0 0 8px; font-size: 16px; }
+    .mode-card ul     { padding-left: 18px; font-size: 13.5px; color: #374151; }
+    .mode-card li     { margin-bottom: 4px; }
+
+    /* ── footer ── */
+    .page-footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e6f0; font-size: 13px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<!-- ── navbar ── -->
+<nav class="navbar">
+  <span class="navbar-brand">seamless_data</span>
+  <a href="database.html" class="active">Database Connection</a>
+</nav>
+
+<!-- ── main ── -->
+<main>
+  <h1>Database Connection</h1>
+  <p>การเชื่อมต่อฐานข้อมูล PostgreSQL รองรับ 2 modes: <span class="badge badge-ssh">SSH Tunnel</span> และ <span class="badge badge-direct">Direct</span></p>
+
+  <!-- ── overview ── -->
+  <h2>Overview</h2>
+
+  <div class="mode-grid">
+    <div class="mode-card ssh">
+      <h3>SSH Tunnel</h3>
+      <ul>
+        <li>เชื่อมต่อผ่าน SSH server ก่อน</li>
+        <li>DB อยู่ใน private network</li>
+        <li>รองรับ password และ private key</li>
+        <li>ตั้งค่า <code>DB_CONNECTION_MODE=ssh</code></li>
+      </ul>
+    </div>
+    <div class="mode-card direct">
+      <h3>Direct</h3>
+      <ul>
+        <li>เชื่อมต่อ DB โดยตรง</li>
+        <li>DB เข้าถึงได้จากเครื่อง local</li>
+        <li>ไม่ต้องการ SSH credentials</li>
+        <li>ตั้งค่า <code>DB_CONNECTION_MODE=direct</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── environment variables ── -->
+  <h2>Environment Variables</h2>
+
+  <h3>ตัวแปรหลัก</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>หมายเหตุ</th><th></th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>DB_CONNECTION_MODE</code></td>
+        <td><code>ssh</code></td>
+        <td>โหมดการเชื่อมต่อ: <code>ssh</code> หรือ <code>direct</code></td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>DB_NAME</code></td>
+        <td><code>ic_finance</code></td>
+        <td>ชื่อฐานข้อมูล</td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>DB_USERNAME</code></td>
+        <td>—</td>
+        <td>ชื่อผู้ใช้ PostgreSQL</td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>DB_PASSWORD</code></td>
+        <td>—</td>
+        <td>รหัสผ่าน PostgreSQL</td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>DB_HOST</code></td>
+        <td><code>localhost</code></td>
+        <td>SSH: host ของ DB ที่มองจาก SSH server / Direct: host จริง</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+      <tr>
+        <td><code>DB_PORT</code></td>
+        <td><code>5432</code></td>
+        <td>port ของ PostgreSQL</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>SSH Tunnel <span class="badge badge-ssh">ssh mode เท่านั้น</span></h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>หมายเหตุ</th><th></th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>SSH_HOST</code></td>
+        <td><code>192.168.64.2</code></td>
+        <td>IP หรือ hostname ของ SSH server</td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>SSH_PORT</code></td>
+        <td><code>22</code></td>
+        <td>port ของ SSH server</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+      <tr>
+        <td><code>SSH_USERNAME</code></td>
+        <td>—</td>
+        <td>ชื่อผู้ใช้ SSH</td>
+        <td><span class="badge badge-req">required</span></td>
+      </tr>
+      <tr>
+        <td><code>SSH_PASSWORD</code></td>
+        <td>—</td>
+        <td>รหัสผ่าน SSH (ถ้าไม่ใช้ key)</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+      <tr>
+        <td><code>SSH_PKEY</code></td>
+        <td>—</td>
+        <td>path ของ private key (ถ้าใช้ key auth)</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+      <tr>
+        <td><code>SSH_PKEY_PASSWORD</code></td>
+        <td>—</td>
+        <td>passphrase ของ private key</td>
+        <td><span class="badge badge-opt">optional</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Connection Tuning</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>หมายเหตุ</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>DB_CONNECT_TIMEOUT</code></td><td><code>10</code></td><td>timeout (วินาที) ในการเชื่อมต่อ</td></tr>
+      <tr><td><code>DB_APP_NAME</code></td><td><code>python-client</code></td><td>application name ที่แสดงใน pg_stat_activity</td></tr>
+      <tr><td><code>DB_KEEPALIVES_IDLE</code></td><td><code>30</code></td><td>วินาทีก่อนส่ง keepalive แรก</td></tr>
+      <tr><td><code>DB_KEEPALIVES_INTERVAL</code></td><td><code>10</code></td><td>ระยะห่างระหว่าง keepalive</td></tr>
+      <tr><td><code>DB_KEEPALIVES_COUNT</code></td><td><code>5</code></td><td>จำนวนครั้งสูงสุดก่อน drop connection</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── setup ── -->
+  <h2>Setup</h2>
+
+  <h3>1. คัดลอก .env template</h3>
+<pre>cp .env.example .env</pre>
+
+  <h3>2. แก้ไข .env — SSH mode</h3>
+<pre><span class="cm"># .env</span>
+<span class="var">DB_CONNECTION_MODE</span>=<span class="str">ssh</span>
+
+<span class="var">SSH_HOST</span>=<span class="str">192.168.64.2</span>
+<span class="var">SSH_PORT</span>=<span class="str">22</span>
+<span class="var">SSH_USERNAME</span>=<span class="str">your_user</span>
+<span class="var">SSH_PASSWORD</span>=<span class="str">your_password</span>
+
+<span class="var">DB_HOST</span>=<span class="str">localhost</span>
+<span class="var">DB_PORT</span>=<span class="str">5432</span>
+<span class="var">DB_NAME</span>=<span class="str">ic_finance</span>
+<span class="var">DB_USERNAME</span>=<span class="str">db_user</span>
+<span class="var">DB_PASSWORD</span>=<span class="str">db_password</span></pre>
+
+  <h3>2. แก้ไข .env — Direct mode</h3>
+<pre><span class="cm"># .env</span>
+<span class="var">DB_CONNECTION_MODE</span>=<span class="str">direct</span>
+
+<span class="var">DB_HOST</span>=<span class="str">db.example.com</span>
+<span class="var">DB_PORT</span>=<span class="str">5432</span>
+<span class="var">DB_NAME</span>=<span class="str">ic_finance</span>
+<span class="var">DB_USERNAME</span>=<span class="str">db_user</span>
+<span class="var">DB_PASSWORD</span>=<span class="str">db_password</span></pre>
+
+  <h3>3. ทดสอบการเชื่อมต่อ</h3>
+<pre>python tests/test_connection.py</pre>
+
+  <!-- ── usage ── -->
+  <h2>Usage</h2>
+
+  <h3>แบบ context manager (แนะนำ)</h3>
+<pre><span class="kw">from</span> <span class="var">helpers.connect_db</span> <span class="kw">import</span> <span class="fn">db_session</span>
+
+<span class="kw">with</span> <span class="fn">db_session</span>() <span class="kw">as</span> (conn, tunnel):
+    <span class="kw">with</span> conn.<span class="fn">cursor</span>() <span class="kw">as</span> cur:
+        cur.<span class="fn">execute</span>(<span class="str">"SELECT * FROM erp_2025 LIMIT 10"</span>)
+        rows = cur.<span class="fn">fetchall</span>()
+<span class="cm"># commit และ close อัตโนมัติ</span></pre>
+
+  <h3>แบบ manual</h3>
+<pre><span class="kw">from</span> <span class="var">helpers.connect_db</span> <span class="kw">import</span> <span class="fn">connect_to_db</span>, <span class="fn">close_connection</span>
+
+conn, tunnel = <span class="fn">connect_to_db</span>()          <span class="cm"># ใช้ DB_NAME จาก .env</span>
+<span class="cm"># หรือระบุชื่อ DB โดยตรง</span>
+conn, tunnel = <span class="fn">connect_to_db</span>(<span class="str">"ic_finance"</span>)
+
+<span class="kw">try</span>:
+    <span class="kw">with</span> conn.<span class="fn">cursor</span>() <span class="kw">as</span> cur:
+        cur.<span class="fn">execute</span>(<span class="str">"INSERT INTO erp_2025 (...) VALUES (...)"</span>)
+    conn.<span class="fn">commit</span>()
+<span class="kw">except</span> Exception:
+    conn.<span class="fn">rollback</span>()
+    <span class="kw">raise</span>
+<span class="kw">finally</span>:
+    <span class="fn">close_connection</span>(conn, tunnel)</pre>
+
+  <!-- ── file structure ── -->
+  <h2>File Structure</h2>
+<pre>seamless_data/
+├── helpers/
+│   └── connect_db/
+│       ├── __init__.py         <span class="cm"># export: connect_to_db, close_connection, db_session</span>
+│       └── connection.py       <span class="cm"># SSH + direct logic</span>
+├── tests/
+│   └── test_connection.py      <span class="cm"># ทดสอบการเชื่อมต่อ</span>
+├── .env                        <span class="cm"># ค่า config จริง (ไม่ commit)</span>
+├── .env.example                <span class="cm"># template</span>
+└── requirements.txt</pre>
+
+  <div class="callout callout-warning">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <strong>ห้าม commit ไฟล์ <code>.env</code></strong> — เพิ่ม <code>.env</code> เข้า <code>.gitignore</code> เสมอ เพราะมี credentials จริง
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      <strong>paramiko version</strong> — pin ไว้ที่ <code>&lt;3.0.0</code> เพราะ sshtunnel ยังไม่รองรับ paramiko 3.x (ซึ่งลบ DSSKey ออก)
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <strong>tunnel เป็น None เสมอเมื่อใช้ direct mode</strong> — <code>close_connection(conn, tunnel)</code> จัดการ None ได้โดยอัตโนมัติ ไม่ต้องเช็คเอง
+    </div>
+  </div>
+
+  <div class="page-footer">seamless_data — Database Connection Documentation</div>
+</main>
+
+</body>
+</html>
