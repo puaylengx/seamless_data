@@ -20,6 +20,7 @@ ERP_COLUMNS: dict[str, str] = {
     "FundsCtr":          "funds_ctr",
     "CostCtr_ID":        "cost_ctr_id",
     "Cost_Owner":        "cost_owner",
+    "CostNote":          "cost_note",
     "IO_Goods":          "io_goods",
     "IO_Work":           "io_work",
     "IO_Activity":       "io_activity",
