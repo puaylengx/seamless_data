@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Workflow — seamless_data</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f5f6fa;
+    }
+
+    /* ── navbar ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #1a1a2e;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 32px; height: 52px;
+    }
+    .navbar-brand { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: #7b8ab8; margin-right: 16px; white-space: nowrap; }
+    .navbar a { padding: 6px 12px; border-radius: 6px; color: #c8cfe8; text-decoration: none; font-size: 14px; white-space: nowrap; }
+    .navbar a:hover, .navbar a.active { background: #2d2f6b; color: #fff; }
+    .navbar-sep { color: #3d3f6b; margin: 0 4px; }
+
+    /* ── layout ── */
+    main { padding: 48px 56px; max-width: 960px; margin: 0 auto; }
+
+    /* ── typography ── */
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 40px 0 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e6f0; }
+    h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: #2d2f6b; }
+    p  { margin-bottom: 12px; color: #3a3d5c; }
+
+    /* ── table ── */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+    thead tr { background: #1a1a2e; color: #fff; }
+    thead th { padding: 10px 14px; text-align: left; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #eef0f8; }
+    tbody tr:hover { background: #dde2f3; }
+    td { padding: 9px 14px; border-bottom: 1px solid #e2e6f0; vertical-align: top; }
+    td code { background: #f0f2fc; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── code block ── */
+    pre {
+      background: #1e2030; color: #cdd6f4;
+      padding: 20px 24px; border-radius: 10px;
+      overflow-x: auto; font-size: 13.5px; line-height: 1.6;
+      margin: 12px 0 24px;
+    }
+    pre .cm  { color: #6c7086; }
+    pre .kw  { color: #cba6f7; }
+    pre .str { color: #a6e3a1; }
+    pre .cmd { color: #89b4fa; }
+    pre .flag{ color: #fab387; }
+    pre .ok  { color: #a6e3a1; }
+    pre .err { color: #f38ba8; }
+    pre .conflict-ours   { color: #89dceb; }
+    pre .conflict-theirs { color: #fab387; }
+    pre .conflict-marker { color: #f38ba8; font-weight: bold; }
+
+    /* ── callout ── */
+    .callout {
+      display: flex; gap: 12px; padding: 14px 18px;
+      border-radius: 8px; margin: 16px 0 24px; font-size: 14px;
+    }
+    .callout-info    { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .callout-warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .callout-tip     { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .callout-icon    { font-size: 18px; line-height: 1.4; }
+    .callout-body    { color: #374151; }
+    .callout-body strong { color: #111827; }
+
+    /* ── badge ── */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-yes  { background: #d1fae5; color: #065f46; }
+    .badge-no   { background: #fee2e2; color: #991b1b; }
+    .badge-warn { background: #fef3c7; color: #92400e; }
+
+    /* ── branch diagram ── */
+    .branch-diagram {
+      margin: 16px 0 28px; display: flex; flex-direction: column; gap: 0;
+      background: #1e2030; border-radius: 12px; padding: 24px 28px;
+    }
+
+    .bd-main { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+    .bd-main-track { display: flex; align-items: center; gap: 0; flex: 1; }
+    .bd-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .bd-line-h { flex: 1; height: 3px; }
+    .bd-arrow { width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; flex-shrink: 0; }
+    .bd-tag {
+      display: inline-block; padding: 3px 12px; border-radius: 20px;
+      font-family: monospace; font-size: 13px; font-weight: 600; white-space: nowrap;
+    }
+    .bd-note { font-size: 13px; color: #6b7280; margin-left: 8px; }
+
+    .bd-children { padding-left: 28px; display: flex; flex-direction: column; }
+    .bd-child { display: flex; align-items: center; gap: 10px; padding: 7px 0; position: relative; }
+    .bd-child::before {
+      content: '';
+      position: absolute; left: -21px; top: 0; bottom: 50%;
+      border-left: 2px solid #3d4060;
+    }
+    .bd-child::after {
+      content: '';
+      position: absolute; left: -21px; top: 50%;
+      width: 18px; height: 2px; background: #3d4060;
+    }
+    .bd-children .bd-child:last-child::before { bottom: 50%; }
+
+    /* ── workflow stepper ── */
+    .flow-stepper {
+      display: flex; align-items: flex-start; gap: 0;
+      background: #1e2030; border-radius: 12px;
+      padding: 28px 24px; margin: 16px 0 24px;
+      overflow-x: auto;
+    }
+    .fs-node {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      min-width: 110px;
+    }
+    .fs-circle {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: monospace; font-size: 12px; font-weight: 700;
+      border: 3px solid transparent;
+    }
+    .fs-circle.main { background: #1e3a5f; border-color: #89b4fa; color: #89b4fa; }
+    .fs-circle.feat { background: #1a3828; border-color: #a6e3a1; color: #a6e3a1; }
+    .fs-label { font-size: 12px; color: #cdd6f4; text-align: center; font-family: monospace; }
+    .fs-sublabel { font-size: 11px; color: #6c7086; text-align: center; }
+
+    .fs-arrow {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start; padding-top: 14px; gap: 4px;
+      min-width: 80px; flex-shrink: 0;
+    }
+    .fs-arrow-line { width: 100%; height: 2px; background: #3d4060; position: relative; }
+    .fs-arrow-line::after {
+      content: ''; position: absolute; right: -1px; top: -4px;
+      width: 0; height: 0;
+      border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+      border-left: 8px solid #3d4060;
+    }
+    .fs-arrow-label { font-size: 11px; color: #cba6f7; white-space: nowrap; }
+
+    /* ── step list ── */
+    .steps { counter-reset: step; list-style: none; padding: 0; margin: 16px 0 24px; }
+    .steps li {
+      counter-increment: step;
+      display: flex; gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #e2e6f0;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: #1a1a2e; color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .step-body { flex: 1; }
+    .step-body strong { display: block; margin-bottom: 4px; }
+
+    /* ── footer ── */
+    .page-footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e6f0; font-size: 13px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="navbar-brand">seamless_data</span>
+  <a href="../database.html">Database Connection</a>
+  <span class="navbar-sep">/</span>
+  <a href="git-workflow.html" class="active">Git Workflow</a>
+  <a href="git-shared-branch.html">Shared Branch</a>
+</nav>
+
+<main>
+  <h1>Git Workflow</h1>
+  <p>แนวทางการใช้ Git ในโปรเจกต์นี้ ครอบคลุม branch naming, เมื่อไหร่ควรสร้าง branch, ขั้นตอนทำงาน และเมื่อไหร่ควร merge</p>
+
+  <!-- ── branch structure ── -->
+  <h2>โครงสร้าง Branch หลัก</h2>
+
+  <div class="branch-diagram">
+    <!-- main -->
+    <div class="bd-main">
+      <div class="bd-main-track">
+        <div class="bd-dot" style="background:#89b4fa"></div>
+        <div class="bd-line-h" style="background:#89b4fa"></div>
+        <div class="bd-arrow" style="border-left-color:#89b4fa"></div>
+      </div>
+      <span class="bd-tag" style="background:#1e3a5f;color:#89b4fa">main</span>
+      <span class="bd-note">production-ready เสมอ — ห้าม push ตรง</span>
+    </div>
+    <!-- children -->
+    <div class="bd-children">
+      <div class="bd-child">
+        <div class="bd-dot" style="background:#a6e3a1"></div>
+        <span class="bd-tag" style="background:#1a3828;color:#a6e3a1">feature/db-connection</span>
+      </div>
+      <div class="bd-child">
+        <div class="bd-dot" style="background:#f38ba8"></div>
+        <span class="bd-tag" style="background:#3a1a1a;color:#f38ba8">fix/ssh-tunnel-paramiko</span>
+      </div>
+      <div class="bd-child">
+        <div class="bd-dot" style="background:#f9e2af"></div>
+        <span class="bd-tag" style="background:#3a3210;color:#f9e2af">docs/database-html</span>
+      </div>
+      <div class="bd-child">
+        <div class="bd-dot" style="background:#f9e2af"></div>
+        <span class="bd-tag" style="background:#3a3210;color:#f9e2af">docs/knowledge</span>
+        <span class="bd-note">shared branch — หลายคนใช้ร่วมกัน</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body"><strong>ห้าม push ตรงเข้า <code>main</code></strong> — ทุกการเปลี่ยนแปลงต้องผ่าน branch และ merge เท่านั้น</div>
+  </div>
+
+  <!-- ── branch naming ── -->
+  <h2>Branch Naming</h2>
+
+  <pre><span class="flag">&lt;type&gt;</span>/<span class="str">&lt;short-description&gt;</span></pre>
+
+  <table>
+    <thead><tr><th>Type</th><th>ใช้เมื่อ</th><th>ตัวอย่าง</th></tr></thead>
+    <tbody>
+      <tr><td><code>feature/</code></td><td>เพิ่ม feature ใหม่</td><td><code>feature/db-connection</code></td></tr>
+      <tr><td><code>fix/</code></td><td>แก้ bug</td><td><code>fix/ssh-tunnel-paramiko</code></td></tr>
+      <tr><td><code>docs/</code></td><td>เพิ่ม/แก้ documentation</td><td><code>docs/database-html</code></td></tr>
+      <tr><td><code>chore/</code></td><td>setup, config, tooling</td><td><code>chore/gitignore-requirements</code></td></tr>
+      <tr><td><code>refactor/</code></td><td>ปรับโครงสร้างโค้ด ไม่เปลี่ยน behavior</td><td><code>refactor/connection-module</code></td></tr>
+      <tr><td><code>spike/</code></td><td>ทดลอง/สำรวจ ยังไม่แน่ใจ</td><td><code>spike/bigquery-loader</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── when to branch ── -->
+  <h2>เมื่อไหร่ควรสร้าง Branch ใหม่</h2>
+
+  <table>
+    <thead><tr><th>สถานการณ์</th><th>สร้าง branch ใหม่?</th></tr></thead>
+    <tbody>
+      <tr><td>เพิ่ม feature ใหม่</td><td><span class="badge badge-yes">✅ เสมอ</span></td></tr>
+      <tr><td>แก้ bug</td><td><span class="badge badge-yes">✅ เสมอ</span></td></tr>
+      <tr><td>เพิ่ม/แก้ docs งานใหญ่หรือหลายคนทำพร้อมกัน</td><td><span class="badge badge-yes">✅ เสมอ</span></td></tr>
+      <tr><td>ทดลอง/spike</td><td><span class="badge badge-yes">✅ เสมอ</span></td></tr>
+      <tr><td>แก้ typo เล็กน้อยใน branch ที่กำลังทำอยู่</td><td><span class="badge badge-warn">⚠️ ไม่จำเป็น</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── solo workflow ── -->
+  <h2>ขั้นตอนทำงาน (คนเดียว)</h2>
+
+  <ul class="steps">
+    <li>
+      <span class="step-num">1</span>
+      <div class="step-body">
+        <strong>อัปเดต main ให้ล่าสุดก่อนเสมอ</strong>
+        <pre><span class="cmd">git checkout</span> main
+<span class="cmd">git pull</span> origin main</pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">2</span>
+      <div class="step-body">
+        <strong>สร้าง branch ใหม่จาก main</strong>
+        <pre><span class="cmd">git checkout</span> <span class="flag">-b</span> feature/db-connection</pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">3</span>
+      <div class="step-body">
+        <strong>ทำงาน แล้ว commit บ่อยๆ ทีละน้อย</strong>
+        <pre><span class="cmd">git add</span> helpers/
+<span class="cmd">git commit</span> <span class="flag">-m</span> <span class="str">"feat(db): add SSH and direct connection module"</span>
+
+<span class="cmd">git add</span> tests/
+<span class="cmd">git commit</span> <span class="flag">-m</span> <span class="str">"test(db): add connection test script"</span></pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">4</span>
+      <div class="step-body">
+        <strong>Push branch ขึ้น remote</strong>
+        <pre><span class="cmd">git push</span> <span class="flag">-u</span> origin feature/db-connection</pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">5</span>
+      <div class="step-body">
+        <strong>Merge กลับ main เมื่องานเสร็จ</strong>
+        <pre><span class="cmd">git checkout</span> main
+<span class="cmd">git pull</span> origin main          <span class="cm"># อัปเดต main อีกครั้ง</span>
+<span class="cmd">git merge</span> feature/db-connection
+<span class="cmd">git push</span> origin main</pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">6</span>
+      <div class="step-body">
+        <strong>ลบ branch ที่ไม่ใช้แล้ว</strong>
+        <pre><span class="cmd">git branch</span> <span class="flag">-d</span> feature/db-connection           <span class="cm"># ลบ local</span>
+<span class="cmd">git push</span> origin <span class="flag">--delete</span> feature/db-connection  <span class="cm"># ลบ remote</span></pre>
+      </div>
+    </li>
+  </ul>
+
+  <!-- ── when to merge ── -->
+  <h2>เมื่อไหร่ควร Merge</h2>
+
+  <table>
+    <thead><tr><th>สถานการณ์</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>งานใน branch เสร็จ ทดสอบผ่านแล้ว</td><td>merge เข้า <code>main</code></td></tr>
+      <tr><td>branch ค้างนาน main มี commit ใหม่</td><td><code>git merge main</code> เข้า branch ตัวเองเพื่อ sync</td></tr>
+      <tr><td>หลายคนใช้ branch เดียวกัน</td><td>ไม่ merge เข้า main จนกว่าทุกคนพร้อม</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── commit message ── -->
+  <h2>Commit Message — Conventional Commits</h2>
+
+  <pre><span class="flag">&lt;type&gt;</span>(<span class="str">&lt;scope&gt;</span>): <span class="cmd">&lt;subject&gt;</span></pre>
+
+  <p><strong>type</strong> เดียวกับ branch &nbsp;|&nbsp; <strong>scope</strong> คือส่วนที่แก้ &nbsp;|&nbsp; <strong>subject</strong> กระชับ ไม่เกิน 72 ตัวอักษร</p>
+
+  <pre><span class="cm"># ✅ ดี — บอก what และ why ชัดเจน</span>
+<span class="ok">feat(db): add keepalive options to prevent idle connection drop</span>
+<span class="ok">fix(ssh): pin paramiko &lt;3.0 to fix DSSKey removal in paramiko 3.x</span>
+<span class="ok">docs(db): move navbar from sidebar to top for better readability</span>
+<span class="ok">chore: add .gitignore and requirements.txt</span>
+
+<span class="cm"># ❌ ไม่ดี — กว้างเกินไป ไม่รู้ว่าแก้อะไร</span>
+<span class="err">update files</span>
+<span class="err">fix bug</span>
+<span class="err">add stuff</span></pre>
+
+  <!-- ── full flow ── -->
+  <h2>สรุป Flow ทั้งหมด</h2>
+
+  <div class="flow-stepper">
+    <div class="fs-node">
+      <div class="fs-circle main">main</div>
+      <div class="fs-label">main</div>
+    </div>
+
+    <div class="fs-arrow">
+      <div class="fs-arrow-line"></div>
+      <div class="fs-arrow-label">checkout -b</div>
+    </div>
+
+    <div class="fs-node">
+      <div class="fs-circle feat">feat</div>
+      <div class="fs-label">feature/xxx</div>
+      <div class="fs-sublabel">commit · commit · push</div>
+    </div>
+
+    <div class="fs-arrow">
+      <div class="fs-arrow-line"></div>
+      <div class="fs-arrow-label">merge</div>
+    </div>
+
+    <div class="fs-node">
+      <div class="fs-circle main">main</div>
+      <div class="fs-label">main</div>
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <strong>กฎง่ายๆ:</strong> <code>pull</code> ก่อนทำงานทุกครั้ง — commit บ่อยๆ ทีละน้อย — แบ่งไฟล์คนละส่วนเพื่อลด conflict
+    </div>
+  </div>
+
+  <div class="page-footer">seamless_data — Git Workflow</div>
+</main>
+</body>
+</html>
