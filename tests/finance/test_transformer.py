@@ -12,6 +12,7 @@ from src.finance.transformer import ErpTransformer
 def _sample_df() -> pd.DataFrame:
     return pd.DataFrame({
         "year":     ["2025", "2025", "2024"],
+        "month":    ["12",   "1",    "9"],
         "doc_date": ["03.12.2024", "15.01.2025", "30.09.2024"],
         "doc_no":   ["3000028712", "3000028800", "3000028500"],
         "amount":   ["1108.00", "500.00", "250.00"],

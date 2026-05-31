@@ -53,15 +53,17 @@ class ErpTransformer:
                 self.df[col]
                 .astype(str)
                 .str.strip()
-                .apply(lambda v: pd.NA if v.lower() in _NULL_VALUES else v)
+                .apply(lambda v: pd.NA if not isinstance(v, str) or v.lower() in _NULL_VALUES else v)
             )
         return self
 
     def add_fiscal_month(self) -> "ErpTransformer":
-        """เพิ่ม column fiscal_month คำนวณจาก month  (ต้อง convert_bigint_columns ก่อน)
+        """เพิ่ม column fiscal_month คำนวณจาก month (ต้อง convert_bigint_columns ก่อน)
         ปีงบประมาณเริ่ม ต.ค. → fiscal_month 1 .. ก.ย. → fiscal_month 12
         สูตร: ((month + 2) % 12) + 1
         """
+        if "month" not in self.df.columns:
+            return self
         self.df["fiscal_month"] = (
             (pd.to_numeric(self.df["month"], errors="coerce") + 2) % 12 + 1
         ).astype("Int64")
