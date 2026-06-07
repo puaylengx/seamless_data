@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Pipeline — seamless_data</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f5f6fa;
+    }
+
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #1a1a2e; color: #c8cfe8;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 32px; height: 52px;
+    }
+    .navbar-brand { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: #7b8ab8; margin-right: 16px; white-space: nowrap; }
+    .navbar a { padding: 6px 12px; border-radius: 6px; color: #c8cfe8; text-decoration: none; font-size: 14px; white-space: nowrap; }
+    .navbar a:hover, .navbar a.active { background: #2d2f6b; color: #fff; }
+
+    main { padding: 48px 56px; max-width: 1040px; margin: 0 auto; }
+
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 48px 0 14px; padding-bottom: 8px; border-bottom: 2px solid #e2e6f0; }
+    h3 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; color: #2d2f6b; }
+    h4 { font-size: 13.5px; font-weight: 600; margin: 20px 0 8px; color: #4b5563; text-transform: uppercase; letter-spacing: .06em; }
+    p  { margin-bottom: 12px; color: #3a3d5c; }
+
+    /* tabs */
+    .tabs { display: flex; gap: 4px; margin: 24px 0 0; border-bottom: 2px solid #e2e6f0; }
+    .tab-btn {
+      padding: 8px 22px; border: none; background: none; cursor: pointer;
+      font-size: 14px; font-weight: 600; color: #6b7280; border-radius: 8px 8px 0 0;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+    }
+    .tab-btn.active { color: #2d2f6b; border-bottom-color: #2d2f6b; background: #eef0f8; }
+    .tab-panel { display: none; padding-top: 8px; }
+    .tab-panel.active { display: block; }
+
+    /* badge */
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    }
+    .badge-src   { background: #e0e7ff; color: #3730a3; }
+    .badge-calc  { background: #fef3c7; color: #92400e; }
+    .badge-direct{ background: #d1fae5; color: #065f46; }
+    .badge-req   { background: #fee2e2; color: #991b1b; }
+    .badge-opt   { background: #f3f4f6; color: #6b7280; }
+    .badge-flag  { background: #fce7f3; color: #9d174d; }
+
+    /* table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 28px; font-size: 13.5px; }
+    thead tr { background: #1a1a2e; color: #fff; }
+    thead th { padding: 10px 14px; text-align: left; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #eef0f8; }
+    tbody tr:hover { background: #dde2f3; }
+    td { padding: 9px 14px; border-bottom: 1px solid #e2e6f0; vertical-align: top; }
+    td code { background: #f0f2fc; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; font-family: "SF Mono", "Fira Code", monospace; }
+
+    /* code block */
+    pre {
+      background: #1e2030; color: #cdd6f4;
+      padding: 18px 22px; border-radius: 10px;
+      overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 10px 0 24px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    /* callout */
+    .callout {
+      display: flex; gap: 12px; padding: 14px 18px; border-radius: 8px;
+      margin: 14px 0 22px; font-size: 14px;
+    }
+    .callout-info    { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .callout-warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .callout-tip     { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .callout-icon    { font-size: 18px; line-height: 1.4; }
+    .callout-body    { color: #374151; }
+
+    /* flow */
+    .flow {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 0; margin: 20px 0 28px;
+    }
+    .flow-step {
+      background: #fff; border: 2px solid #818cf8; border-radius: 10px;
+      padding: 14px 20px; min-width: 140px; text-align: center;
+    }
+    .flow-step .step-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+    .flow-step .step-name  { font-size: 14px; font-weight: 700; color: #2d2f6b; }
+    .flow-step .step-cmd   { font-size: 12px; color: #818cf8; font-family: monospace; margin-top: 3px; }
+    .flow-arrow { font-size: 22px; color: #818cf8; padding: 0 8px; }
+    .flow-step.green { border-color: #34d399; }
+    .flow-step.green .step-name { color: #065f46; }
+    .flow-step.green .step-cmd  { color: #34d399; }
+    .flow-step.amber { border-color: #f59e0b; }
+    .flow-step.amber .step-name { color: #92400e; }
+    .flow-step.amber .step-cmd  { color: #f59e0b; }
+
+    /* command grid */
+    .cmd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin: 14px 0 28px; }
+    .cmd-card {
+      border-radius: 10px; padding: 16px 18px;
+      border: 2px solid #e2e6f0; background: #fff;
+    }
+    .cmd-card .cmd-name { font-family: monospace; font-size: 14px; font-weight: 700; color: #2d2f6b; margin-bottom: 4px; }
+    .cmd-card .cmd-desc { font-size: 13px; color: #4b5563; }
+
+    /* section divider */
+    .module-header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #2d2f6b 100%);
+      color: #fff; border-radius: 12px; padding: 22px 28px; margin: 40px 0 28px;
+    }
+    .module-header h2 { font-size: 22px; border: none; margin: 0 0 4px; padding: 0; color: #fff; }
+    .module-header p  { color: #a5b4fc; margin: 0; font-size: 14px; }
+
+    .page-footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e6f0; font-size: 13px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="navbar-brand">seamless_data</span>
+  <a href="database.html">Database Connection</a>
+  <a href="research-pipeline.html" class="active">Research Pipeline</a>
+  <a href="knowledge/git-workflow.html">Git Workflow</a>
+  <a href="knowledge/git-shared-branch.html">Shared Branch</a>
+</nav>
+
+<main>
+  <h1>Research Pipeline</h1>
+  <p>เอกสารอธิบายการทำงานของ pipeline สำหรับ module <strong>research</strong> ซึ่งประกอบด้วย 2 sub-module:
+     <strong>Publication</strong> (ผลงานวิจัยตีพิมพ์) และ <strong>Track Evaluation</strong> (การประเมินผลงาน)</p>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body">
+      ทั้งสอง module มี CLI interface เดียวกัน:
+      <code>template</code> → <code>pipeline</code> / <code>export</code> / <code>upload</code> / <code>upload_bq</code>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!--  PUBLICATION                                          -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="module-header">
+    <h2>Publication</h2>
+    <p>src/research/publication/ &nbsp;·&nbsp; ผลงานวิจัยตีพิมพ์ (WoS, Scopus, TCI)</p>
+  </div>
+
+  <h2>วิธีการทำงาน (Flow)</h2>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="step-label">Input</div>
+      <div class="step-name">Raw Excel</div>
+      <div class="step-cmd">ไฟล์ต้นฉบับ</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="step-label">Step 1</div>
+      <div class="step-name">Template</div>
+      <div class="step-cmd">template</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step green">
+      <div class="step-label">Step 2a</div>
+      <div class="step-name">Export Excel</div>
+      <div class="step-cmd">export</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step amber">
+      <div class="step-label">Step 2b</div>
+      <div class="step-name">Upload MSSQL</div>
+      <div class="step-cmd">upload</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step amber">
+      <div class="step-label">Step 2c</div>
+      <div class="step-name">Upload BigQuery</div>
+      <div class="step-cmd">upload_bq</div>
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <code>pipeline</code> รวม Step 2a + 2b + 2c ไว้ในคำสั่งเดียว — Export Excel เสมอ, upload MSSQL/BQ ขึ้นกับ flag ใน <code>.env</code>
+      (<code>PUBLICATION_UPLOAD_MSSQL</code>, <code>PUBLICATION_UPLOAD_BQ</code>)
+    </div>
+  </div>
+
+  <h2>คำสั่งที่ใช้งาน</h2>
+  <div class="cmd-grid">
+    <div class="cmd-card">
+      <div class="cmd-name">template</div>
+      <div class="cmd-desc">รับ raw Excel → แปลง + parse → บันทึก draft template ใน <code>02_template/</code></div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">pipeline</div>
+      <div class="cmd-desc">รับ template → validate → export Excel + upload ตาม .env flags ทีเดียว</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">export</div>
+      <div class="cmd-desc">รับ template → validate → บันทึก final Excel ใน <code>03_export/</code></div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">upload</div>
+      <div class="cmd-desc">รับ template → validate → insert เข้า MSSQL (<code>publications</code>)</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">upload_bq</div>
+      <div class="cmd-desc">รับ template → validate → MERGE เข้า BigQuery (<code>Research.publications</code>)</div>
+    </div>
+  </div>
+
+  <pre>python src/research/publication/main.py template   &lt;raw_excel_path&gt;
+python src/research/publication/main.py pipeline  &lt;template_path&gt;
+python src/research/publication/main.py export    &lt;template_path&gt;
+python src/research/publication/main.py upload    &lt;template_path&gt;
+python src/research/publication/main.py upload_bq &lt;template_path&gt;</pre>
+
+  <h2>โครงสร้าง Directory</h2>
+  <pre>data/research/publication/
+  ├── 02_template/   ← output จาก template  (draft_publications_template_YYYY-MM-DD.xlsx)
+  └── 03_export/     ← output จาก export    (publications_export_YYYY-MM-DD_HH-MM-SS.xlsx)
+
+logs/research/publication/check_value/
+  └── check_value_YYYY-MM-DD.log</pre>
+
+  <h2>Input Excel — คอลัมน์ที่จำเป็น</h2>
+  <table>
+    <thead><tr><th>คอลัมน์ใน Excel</th><th>ประเภท</th><th>ใช้สร้างคอลัมน์</th></tr></thead>
+    <tbody>
+      <tr><td><code>Rank</code></td><td><span class="badge badge-req">required</span></td><td><code>rank</code>, <code>group_rank</code></td></tr>
+      <tr><td><code>Description</code></td><td><span class="badge badge-req">required</span></td><td><code>description</code></td></tr>
+      <tr><td><code>Division</code></td><td><span class="badge badge-req">required</span></td><td><code>division</code></td></tr>
+      <tr><td><code>Product Code</code></td><td><span class="badge badge-req">required</span></td><td><code>product_code</code></td></tr>
+      <tr><td><code>Firstname</code></td><td><span class="badge badge-req">required</span></td><td><code>firstname</code></td></tr>
+      <tr><td><code>Lastname</code></td><td><span class="badge badge-req">required</span></td><td><code>lastname</code></td></tr>
+      <tr><td><code>Title</code></td><td><span class="badge badge-req">required</span></td><td><code>title</code></td></tr>
+      <tr><td><code>Journal/Conference/Source</code></td><td><span class="badge badge-req">required</span></td><td><code>source</code></td></tr>
+      <tr><td><code>Database (WoS, Scopus, TCI)</code></td><td><span class="badge badge-req">required</span></td><td>DB flags ทั้งหมด, <code>field</code>, <code>national_international</code></td></tr>
+      <tr><td><code>Month</code></td><td><span class="badge badge-req">required</span></td><td><code>publication_month</code>, <code>publication_budget_year</code></td></tr>
+      <tr><td><code>Year</code></td><td><span class="badge badge-req">required</span></td><td><code>publication_year</code>, <code>publication_calendar_year</code>, <code>publication_budget_year</code></td></tr>
+      <tr><td><code>Online Date</code></td><td><span class="badge badge-opt">optional</span></td><td><code>effective_date</code> (หลัก), fallback ให้ Month</td></tr>
+      <tr><td><code>Publication Date</code></td><td><span class="badge badge-opt">optional</span></td><td><code>effective_date</code> (fallback ถ้าไม่มี Online Date)</td></tr>
+      <tr><td><code>SDGs Goal</code></td><td><span class="badge badge-opt">optional</span></td><td><code>sdg1</code>–<code>sdg17</code></td></tr>
+      <tr><td><code>Other Classification ("A"…)</code></td><td><span class="badge badge-opt">optional</span></td><td><code>national_international</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- tabs for column derivation -->
+  <h2>ที่มาของแต่ละคอลัมน์ (Template Output)</h2>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab(this,'pub-basic')">ข้อมูลพื้นฐาน</button>
+    <button class="tab-btn" onclick="switchTab(this,'pub-date')">วันที่ &amp; ปี</button>
+    <button class="tab-btn" onclick="switchTab(this,'pub-db')">Database Flags</button>
+    <button class="tab-btn" onclick="switchTab(this,'pub-sdg')">SDG</button>
+  </div>
+
+  <div id="pub-basic" class="tab-panel active">
+    <table>
+      <thead><tr><th>คอลัมน์</th><th>แหล่งที่มา</th><th>ประเภท</th><th>การแปลง</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>rank</code></td>
+          <td><code>Rank</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>Normalize ตัวย่อ เช่น <code>Asst.Prof</code> → <code>Asst.Prof.</code>, <code>Assoc.Prof</code> → <code>Assoc.Prof.</code></td>
+        </tr>
+        <tr>
+          <td><code>group_rank</code></td>
+          <td><code>Rank</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>map: <code>Academic Advisor</code> และ <code>Support Staff</code> → ใช้ชื่อตรง, อื่นๆ ทั้งหมด → <code>Lecturer</code></td>
+        </tr>
+        <tr>
+          <td><code>description</code></td>
+          <td><code>Description</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>division</code></td>
+          <td><code>Division</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>product_code</code></td>
+          <td><code>Product Code</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>firstname</code></td>
+          <td><code>Firstname</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>lastname</code></td>
+          <td><code>Lastname</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td><code>Title</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>source</code></td>
+          <td><code>Journal/Conference/Source</code></td>
+          <td><span class="badge badge-direct">copy</span></td>
+          <td>คัดลอกตรง</td>
+        </tr>
+        <tr>
+          <td><code>national_international</code></td>
+          <td><code>Other Classification</code> + DB flags</td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>
+            1. ถ้า Classification เป็น <em>Being used as public policy</em>, <em>Featured role International venue</em>, หรือ <em>Group/International</em> → <code>International</code><br>
+            2. ถ้า Classification เป็น null → ดู DB flags: ถ้ามี flag นานาชาติใดเป็น 1 → <code>International</code>, ไม่มี → <code>National</code><br>
+            3. อื่นๆ → ใช้ค่าจาก Classification ตรงๆ
+          </td>
+        </tr>
+        <tr>
+          <td><code>field</code></td>
+          <td><code>Database (WoS, Scopus, TCI)</code></td>
+          <td><span class="badge badge-calc">parse</span></td>
+          <td>ดึงข้อความหลัง <code>Field:</code> ในคอลัมน์ Database — เก็บเฉพาะส่วนที่ไม่ใช่ DB indicator</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="pub-date" class="tab-panel">
+    <div class="callout callout-info">
+      <span class="callout-icon">📅</span>
+      <div class="callout-body">
+        <strong>Priority ของวันที่:</strong> ใช้ <code>Online Date</code> เป็นหลัก ถ้าว่างจึงใช้ <code>Publication Date</code>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>คอลัมน์</th><th>แหล่งที่มา</th><th>ประเภท</th><th>การแปลง</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>publication_month</code></td>
+          <td><code>Month</code> → fallback <code>Online/Publication Date</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>
+            ถ้า <code>Month</code> มีค่า:<br>
+            &nbsp;• รูปแบบ <code>YYYY-MM</code> → ดึงส่วน MM<br>
+            &nbsp;• ตัวเลขตรงๆ → แปลงเป็น int<br>
+            ถ้าว่าง → ดึงเดือนจาก <code>Online/Publication Date</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>publication_year</code></td>
+          <td><code>Year</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>ลบอักขระที่ไม่ใช่ตัวเลขออก (<code>\D</code>), แปลงเป็น <code>Int64</code> (nullable), ค่าว่าง → <code>NA</code></td>
+        </tr>
+        <tr>
+          <td><code>publication_calendar_year</code></td>
+          <td><code>Year</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>เหมือน <code>publication_year</code> — ใช้ปี ค.ศ. ตรงๆ</td>
+        </tr>
+        <tr>
+          <td><code>publication_budget_year</code></td>
+          <td><code>Year</code> + <code>Month</code></td>
+          <td><span class="badge badge-calc">คำนวณ</span></td>
+          <td>ถ้า <code>publication_month &gt;= 10</code> (ต.ค.–ธ.ค.) → ปีงบประมาณ = ปี + 1, ไม่เช่นนั้น = ปีเดิม</td>
+        </tr>
+        <tr>
+          <td><code>effective_date</code></td>
+          <td><code>Online Date</code> หรือ <code>Publication Date</code></td>
+          <td><span class="badge badge-calc">แปลง</span></td>
+          <td>
+            รองรับหลายรูปแบบ:<br>
+            &nbsp;• <code>"January 2024"</code> → <code>2024-01-31</code> (วันสุดท้ายของเดือน)<br>
+            &nbsp;• วันที่ทั่วไป → <code>YYYY-MM-DD</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="pub-db" class="tab-panel">
+    <div class="callout callout-info">
+      <span class="callout-icon">🔍</span>
+      <div class="callout-body">
+        คอลัมน์เหล่านี้ parse มาจากข้อความใน <code>Database (WoS, Scopus, TCI)</code> เก็บเป็น flag <strong>0 หรือ 1</strong>
+        (0 = ไม่อยู่ในฐานข้อมูลนั้น, 1 = อยู่)
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>คอลัมน์</th><th>เงื่อนไขที่เป็น 1</th></tr></thead>
+      <tbody>
+        <tr><td><code>WoS_with_JIF-P90</code></td><td>ข้อความมี <code>WoS</code> และมี <code>JIF</code> ตามด้วยตัวเลข ≥ 90</td></tr>
+        <tr><td><code>WoS_with_JIF</code></td><td>ข้อความมี <code>WoS</code> และมีตัวเลข JIF (ทุกค่า)</td></tr>
+        <tr><td><code>WoS_SC</code></td><td>มี <code>WoS</code> และ <code>(SC)</code></td></tr>
+        <tr><td><code>WoS_SS</code></td><td>มี <code>WoS</code> และ <code>(SS)</code></td></tr>
+        <tr><td><code>WoS_AH</code></td><td>มี <code>WoS</code> และ <code>(AH)</code></td></tr>
+        <tr><td><code>WoS_ES</code></td><td>มี <code>WoS</code> และ <code>(ES)</code></td></tr>
+        <tr><td><code>Scopus_SJR-10</code></td><td>มี <code>Scopus SJR-10</code> หรือ <code>Scimago rank ≤ 10% ของ total</code></td></tr>
+        <tr><td><code>Scopus_Q1</code></td><td>มี <code>Scopus</code> และ <code>SJR-Q1</code></td></tr>
+        <tr><td><code>Scopus_Q2</code></td><td>มี <code>Scopus</code> และ <code>SJR-Q2</code></td></tr>
+        <tr><td><code>Scopus_Q3</code></td><td>มี <code>Scopus</code> และ <code>SJR-Q3</code></td></tr>
+        <tr><td><code>Scopus_Q4</code></td><td>มี <code>Scopus</code> และ <code>SJR-Q4</code></td></tr>
+        <tr><td><code>Scopus_No_Q</code></td><td>มี <code>Scopus</code> และ <code>No_Q</code></td></tr>
+        <tr><td><code>SENSE_ABC</code></td><td>มี <code>SENSE</code></td></tr>
+        <tr><td><code>ERIC</code></td><td>มี <code>ERIC</code></td></tr>
+        <tr><td><code>MathSciNet</code></td><td>มี <code>MathSciNet</code></td></tr>
+        <tr><td><code>Pubmed</code></td><td>มี <code>Pubmed</code></td></tr>
+        <tr><td><code>JSTOR</code></td><td>มี <code>JSTOR</code></td></tr>
+        <tr><td><code>Project_Muse</code></td><td>มี <code>ProjectMuse</code></td></tr>
+        <tr><td><code>Other_Inter.Databases</code></td><td>มี <code>Other_Inter.Databases</code></td></tr>
+        <tr><td><code>TCI_Group1</code></td><td>มี <code>TCI</code> (case-insensitive) และ <code>group1</code> (ignore spaces)</td></tr>
+        <tr><td><code>TCI_Group2</code></td><td>มี <code>TCI</code> (case-insensitive) และ <code>group2</code> (ignore spaces)</td></tr>
+        <tr><td><code>National_Journal</code></td><td>มี <code>National</code> และ <code>Journal</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-warning">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        ข้อความใน <code>Database (WoS, Scopus, TCI)</code> ต้องใช้รูปแบบตามที่กำหนด เช่น <code>WoS JIF90, Scopus SJR-Q1, TCI Group1</code>
+        — ตัวสะกดผิดหรือ format ต่างออกไปจะทำให้ flag เป็น 0
+      </div>
+    </div>
+  </div>
+
+  <div id="pub-sdg" class="tab-panel">
+    <div class="callout callout-info">
+      <span class="callout-icon">🌱</span>
+      <div class="callout-body">
+        parse มาจากคอลัมน์ <code>SDGs Goal</code> ซึ่งเป็น comma-separated list ของตัวเลข เช่น <code>3, 4.2, 13</code>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>คอลัมน์</th><th>เงื่อนไขที่เป็น 1</th></tr></thead>
+      <tbody>
+        <tr><td><code>sdg1</code></td><td>มีเลข <code>1</code> (หรือ <code>1.x</code>) ใน SDGs Goal</td></tr>
+        <tr><td><code>sdg2</code></td><td>มีเลข <code>2</code></td></tr>
+        <tr><td><code>sdg3</code> – <code>sdg16</code></td><td>เช่นเดียวกัน (ตัวเลข 3–16)</td></tr>
+        <tr><td><code>sdg17</code></td><td>มีเลข <code>17</code></td></tr>
+      </tbody>
+    </table>
+    <p>ตัวเลขที่มีทศนิยม เช่น <code>4.2</code> → นับเฉพาะส่วนหน้า (<code>4</code>) &nbsp;·&nbsp; ค่า null → ทุก sdg เป็น 0</p>
+  </div>
+
+  <h2>Validation ก่อน Upload</h2>
+  <table>
+    <thead><tr><th>รายการตรวจสอบ</th><th>เงื่อนไข</th><th>ผลถ้าไม่ผ่าน</th></tr></thead>
+    <tbody>
+      <tr><td>Non-nullable text</td><td><code>rank</code>, <code>group_rank</code>, <code>description</code>, <code>product_code</code>, <code>firstname</code>, <code>lastname</code>, <code>title</code> ต้องไม่ null</td><td>error — หยุด upload</td></tr>
+      <tr><td>publication_month</td><td>ต้องอยู่ในช่วง 1–12; ถ้าไม่ได้จะพยายามเติมจาก <code>effective_date</code> แทน</td><td>warning ถ้ายังแก้ไม่ได้</td></tr>
+      <tr><td>ปีทั้งสาม</td><td><code>publication_year</code>, <code>publication_calendar_year</code>, <code>publication_budget_year</code> ต้องเป็นเลขบวก</td><td>warning</td></tr>
+      <tr><td>DB flags &amp; SDG flags</td><td>ทุก flag ต้องเป็น 0 หรือ 1 เท่านั้น</td><td>warning</td></tr>
+      <tr><td>effective_date</td><td>ต้องแปลงเป็น datetime ได้</td><td>warning</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Database Schema</h2>
+  <h3>BigQuery — <code>muic-data-prod.Research.publications</code></h3>
+  <p>CLUSTER BY <code>product_code</code>, <code>firstname</code>, <code>lastname</code>, <code>title</code> &nbsp;·&nbsp; MERGE key: product_code + publication_year + publication_month + firstname + lastname + title</p>
+  <table>
+    <thead><tr><th>คอลัมน์ (BQ)</th><th>Type</th><th>คอลัมน์ template</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td><code>rank</code></td><td>STRING NOT NULL</td><td><code>rank</code></td><td></td></tr>
+      <tr><td><code>group_rank</code></td><td>STRING</td><td><code>group_rank</code></td><td></td></tr>
+      <tr><td><code>description</code></td><td>STRING</td><td><code>description</code></td><td></td></tr>
+      <tr><td><code>product_code</code></td><td>STRING NOT NULL</td><td><code>product_code</code></td><td>MERGE key</td></tr>
+      <tr><td><code>firstname</code></td><td>STRING NOT NULL</td><td><code>firstname</code></td><td>MERGE key</td></tr>
+      <tr><td><code>lastname</code></td><td>STRING NOT NULL</td><td><code>lastname</code></td><td>MERGE key</td></tr>
+      <tr><td><code>title</code></td><td>STRING NOT NULL</td><td><code>title</code></td><td>MERGE key</td></tr>
+      <tr><td><code>source</code></td><td>STRING</td><td><code>source</code></td><td></td></tr>
+      <tr><td><code>national_international</code></td><td>STRING</td><td><code>national_international</code></td><td></td></tr>
+      <tr><td><code>field</code></td><td>STRING</td><td><code>field</code></td><td>parse จาก Database column</td></tr>
+      <tr><td><code>division</code></td><td>STRING</td><td><code>division</code></td><td></td></tr>
+      <tr><td><code>effective_date</code></td><td>DATE</td><td><code>effective_date</code></td><td></td></tr>
+      <tr><td><code>publication_month</code></td><td>INT64</td><td><code>publication_month</code></td><td>MERGE key</td></tr>
+      <tr><td><code>publication_year</code></td><td>INT64</td><td><code>publication_year</code></td><td>MERGE key</td></tr>
+      <tr><td><code>publication_calendar_year</code></td><td>INT64</td><td><code>publication_calendar_year</code></td><td></td></tr>
+      <tr><td><code>publication_budget_year</code></td><td>INT64</td><td><code>publication_budget_year</code></td><td></td></tr>
+      <tr><td><code>wos_with_jif_p90</code> … <code>national_journal</code></td><td>INT64</td><td>DB flags</td><td>0/1 flag 22 คอลัมน์</td></tr>
+      <tr><td><code>sdg1</code> … <code>sdg17</code></td><td>INT64</td><td><code>sdg1</code>–<code>sdg17</code></td><td>0/1 flag 17 คอลัมน์</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!--  TRACK EVALUATION                                     -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="module-header" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); margin-top: 72px;">
+    <h2>Track Evaluation</h2>
+    <p>src/research/track_evaluation/ &nbsp;·&nbsp; ข้อมูลการประเมินและคะแนนผลงานรายบุคคล</p>
+  </div>
+
+  <h2>วิธีการทำงาน (Flow)</h2>
+  <div class="flow">
+    <div class="flow-step" style="border-color:#34d399;">
+      <div class="step-label">Input</div>
+      <div class="step-name">Raw Excel</div>
+      <div class="step-cmd">ไฟล์ต้นฉบับ</div>
+    </div>
+    <div class="flow-arrow" style="color:#34d399;">→</div>
+    <div class="flow-step" style="border-color:#34d399;">
+      <div class="step-label">Step 1</div>
+      <div class="step-name">Template</div>
+      <div class="step-cmd">template</div>
+    </div>
+    <div class="flow-arrow" style="color:#34d399;">→</div>
+    <div class="flow-step green">
+      <div class="step-label">Step 2a</div>
+      <div class="step-name">Export Excel</div>
+      <div class="step-cmd">export</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step amber">
+      <div class="step-label">Step 2b</div>
+      <div class="step-name">Upload MSSQL</div>
+      <div class="step-cmd">upload</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step amber">
+      <div class="step-label">Step 2c</div>
+      <div class="step-name">Upload BigQuery</div>
+      <div class="step-cmd">upload_bq</div>
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <code>pipeline</code> รวม Step 2b + 2c ตาม flag ใน <code>.env</code>
+      (<code>TRACK_EVAL_UPLOAD_MSSQL</code>, <code>TRACK_EVAL_UPLOAD_BQ</code>) —
+      ถ้า flag ทั้งคู่เป็น <code>false</code> จะ log แล้วออกทันที ไม่ export
+    </div>
+  </div>
+
+  <h2>คำสั่งที่ใช้งาน</h2>
+  <div class="cmd-grid">
+    <div class="cmd-card">
+      <div class="cmd-name">template</div>
+      <div class="cmd-desc">รับ raw Excel → build template → บันทึก draft ใน <code>02_template/</code></div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">pipeline</div>
+      <div class="cmd-desc">รับ template → validate → upload MSSQL/BQ ตาม .env flags</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">export</div>
+      <div class="cmd-desc">รับ template → validate → บันทึก final Excel ใน <code>03_export/</code></div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">upload</div>
+      <div class="cmd-desc">รับ template → validate → rename columns → insert เข้า MSSQL (<code>track_evaluation</code>)</div>
+    </div>
+    <div class="cmd-card">
+      <div class="cmd-name">upload_bq</div>
+      <div class="cmd-desc">รับ template → validate → rename columns → MERGE เข้า BigQuery (<code>Research.track_evaluation</code>)</div>
+    </div>
+  </div>
+
+  <pre>python src/research/track_evaluation/main.py template   &lt;raw_excel_path&gt;
+python src/research/track_evaluation/main.py pipeline  &lt;template_path&gt;
+python src/research/track_evaluation/main.py export    &lt;template_path&gt;
+python src/research/track_evaluation/main.py upload    &lt;template_path&gt;
+python src/research/track_evaluation/main.py upload_bq &lt;template_path&gt;</pre>
+
+  <h2>โครงสร้าง Directory</h2>
+  <pre>data/research/track_evaluation/
+  ├── 02_template/   ← output จาก template  (draft_track_evaluation_template_YYYY-MM-DD_HH-MM-SS.xlsx)
+  └── 03_export/     ← output จาก export    (track_evaluation_export_YYYY-MM-DD_HH-MM-SS.xlsx)
+
+logs/research/track_evaluation/
+  └── track_evaluation_YYYY-MM-DD_HH-MM-SS.log</pre>
+
+  <h2>Input Excel — คอลัมน์ที่จำเป็น</h2>
+  <table>
+    <thead><tr><th>คอลัมน์ใน Excel</th><th>ประเภท</th><th>ใช้สร้างคอลัมน์</th></tr></thead>
+    <tbody>
+      <tr><td><code>Product Code</code></td><td><span class="badge badge-req">required</span></td><td><code>Product Code</code></td></tr>
+      <tr><td><code>RC Meeting</code></td><td><span class="badge badge-req">required</span></td><td><code>RC Meeting</code></td></tr>
+      <tr><td><code>Month</code></td><td><span class="badge badge-req">required</span></td><td><code>Publication_month</code>, <code>orderNum</code></td></tr>
+      <tr><td><code>Year</code></td><td><span class="badge badge-req">required</span></td><td><code>Publication_year</code></td></tr>
+      <tr><td><code>Online Date</code></td><td><span class="badge badge-opt">optional</span></td><td><code>PublicationDate</code> (หลัก), fallback ให้ Month</td></tr>
+      <tr><td><code>Publication Date</code></td><td><span class="badge badge-opt">optional</span></td><td><code>PublicationDate</code> (fallback)</td></tr>
+      <tr><td><code>Firstname</code></td><td><span class="badge badge-req">required</span></td><td><code>Firstname</code></td></tr>
+      <tr><td><code>Lastname</code></td><td><span class="badge badge-req">required</span></td><td><code>Lastname</code></td></tr>
+      <tr><td><code>Rank</code></td><td><span class="badge badge-req">required</span></td><td><code>Rank</code></td></tr>
+      <tr><td><code>Division</code></td><td><span class="badge badge-req">required</span></td><td><code>Division</code></td></tr>
+      <tr><td><code>Description</code></td><td><span class="badge badge-req">required</span></td><td><code>Description</code></td></tr>
+      <tr><td><code>Weight</code></td><td><span class="badge badge-req">required</span></td><td><code>Weight</code></td></tr>
+      <tr><td><code>Quality</code></td><td><span class="badge badge-req">required</span></td><td><code>Quality</code></td></tr>
+      <tr><td><code>Corresponding</code></td><td><span class="badge badge-opt">optional</span></td><td><code>Corresponding</code></td></tr>
+      <tr><td><code>Contribution</code></td><td><span class="badge badge-req">required</span></td><td><code>Contribution</code></td></tr>
+      <tr><td><code>SCORE</code></td><td><span class="badge badge-req">required</span></td><td><code>SCORE</code></td></tr>
+      <tr><td><code>REWARD</code></td><td><span class="badge badge-opt">optional</span></td><td><code>REWARD</code></td></tr>
+      <tr><td><code>Title</code></td><td><span class="badge badge-req">required</span></td><td><code>Title</code></td></tr>
+      <tr><td><code>Journal/Conference/Source</code></td><td><span class="badge badge-req">required</span></td><td><code>Source</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>ที่มาของแต่ละคอลัมน์ (Template Output)</h2>
+  <table>
+    <thead><tr><th>คอลัมน์ (template)</th><th>คอลัมน์ (DB)</th><th>แหล่งที่มา</th><th>ประเภท</th><th>การแปลง</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>Product Code</code></td><td><code>product_code</code></td>
+        <td><code>Product Code</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>RC Meeting</code></td><td><code>rc_meeting</code></td>
+        <td><code>RC Meeting</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Publication_month</code></td><td><code>publication_month</code></td>
+        <td><code>Month</code> → fallback date</td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>แปลงเป็น<strong>ชื่อเดือน</strong> (<code>January</code>…<code>December</code>) — fallback ใช้ Online/Publication Date</td>
+      </tr>
+      <tr>
+        <td><code>orderNum</code></td><td><code>order_num</code></td>
+        <td><code>Month</code> → fallback date</td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>แปลงเป็น<strong>ตัวเลขเดือน</strong> 1–12 — fallback ใช้ Online/Publication Date (ช่วย sort ตามลำดับเวลา)</td>
+      </tr>
+      <tr>
+        <td><code>Publication_year</code></td><td><code>publication_year</code></td>
+        <td><code>Year</code></td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>ลบอักขระที่ไม่ใช่ตัวเลข, แปลงเป็น <code>Int64</code></td>
+      </tr>
+      <tr>
+        <td><code>PublicationDate</code></td><td><code>publication_date</code></td>
+        <td><code>Online Date</code> หรือ <code>Publication Date</code></td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>แปลงเป็น <code>YYYY-MM-DD</code> — ถ้าเป็น <code>"January 2024"</code> → ใช้วันสุดท้ายของเดือน (<code>2024-01-31</code>)</td>
+      </tr>
+      <tr>
+        <td><code>Firstname</code></td><td><code>firstname</code></td>
+        <td><code>Firstname</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Lastname</code></td><td><code>lastname</code></td>
+        <td><code>Lastname</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Rank</code></td><td><code>rank</code></td>
+        <td><code>Rank</code></td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>Normalize ตัวย่อ (ใช้ logic เดียวกับ publication)</td>
+      </tr>
+      <tr>
+        <td><code>Division</code></td><td><code>division</code></td>
+        <td><code>Division</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Description</code></td><td><code>description</code></td>
+        <td><code>Description</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Weight</code></td><td><code>weight</code></td>
+        <td><code>Weight</code></td><td><span class="badge badge-direct">copy</span></td><td>round ทศนิยม 2 ตำแหน่งตอน upload</td>
+      </tr>
+      <tr>
+        <td><code>Quality</code></td><td><code>quality</code></td>
+        <td><code>Quality</code></td><td><span class="badge badge-direct">copy</span></td><td>round ทศนิยม 2 ตำแหน่งตอน upload</td>
+      </tr>
+      <tr>
+        <td><code>Corresponding</code></td><td><code>corresponding</code></td>
+        <td><code>Corresponding</code></td><td><span class="badge badge-calc">แปลง</span></td>
+        <td>Title case (<code>yes</code> → <code>Yes</code>, <code>no</code> → <code>No</code>), blank = ไม่มีข้อมูล</td>
+      </tr>
+      <tr>
+        <td><code>Contribution</code></td><td><code>contribution</code></td>
+        <td><code>Contribution</code></td><td><span class="badge badge-direct">copy</span></td><td>round ทศนิยม 2 ตำแหน่งตอน upload</td>
+      </tr>
+      <tr>
+        <td><code>SCORE</code></td><td><code>score</code></td>
+        <td><code>SCORE</code></td><td><span class="badge badge-direct">copy</span></td><td>round ทศนิยม 2 ตำแหน่งตอน upload</td>
+      </tr>
+      <tr>
+        <td><code>REWARD</code></td><td><code>reward</code></td>
+        <td><code>REWARD</code></td><td><span class="badge badge-direct">copy</span></td><td>เติม 0 ถ้าว่าง (ตอน validate)</td>
+      </tr>
+      <tr>
+        <td><code>Title</code></td><td><code>title</code></td>
+        <td><code>Title</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง</td>
+      </tr>
+      <tr>
+        <td><code>Source</code></td><td><code>source</code></td>
+        <td><code>Journal/Conference/Source</code></td><td><span class="badge badge-direct">copy</span></td><td>คัดลอกตรง (rename เท่านั้น)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">🔄</span>
+    <div class="callout-body">
+      ขั้นตอน <code>upload</code> / <code>upload_bq</code> จะเติมค่าอัตโนมัติจาก <code>PublicationDate</code>
+      ถ้า <code>Publication_month</code>, <code>Publication_year</code>, หรือ <code>orderNum</code> ว่างอยู่
+    </div>
+  </div>
+
+  <h2>Validation ก่อน Upload</h2>
+  <table>
+    <thead><tr><th>รายการตรวจสอบ</th><th>เงื่อนไข</th><th>ผลถ้าไม่ผ่าน</th></tr></thead>
+    <tbody>
+      <tr><td>Non-nullable text</td><td><code>rank</code>, <code>description</code>, <code>product_code</code>, <code>firstname</code>, <code>lastname</code>, <code>title</code> ต้องไม่ null/ว่าง</td><td>warning — ยังดำเนินการต่อ</td></tr>
+      <tr><td>order_num</td><td>ต้องอยู่ในช่วง 1–12</td><td>warning</td></tr>
+      <tr><td>publication_year</td><td>ต้องเป็นเลขบวก</td><td>warning</td></tr>
+      <tr><td>publication_date</td><td>ต้องแปลงเป็นวันที่ได้</td><td>warning</td></tr>
+      <tr><td>corresponding</td><td>ต้องเป็น <code>Yes</code>, <code>No</code>, หรือ blank เท่านั้น</td><td>warning</td></tr>
+      <tr><td>numeric columns</td><td><code>weight</code>, <code>quality</code>, <code>contribution</code>, <code>score</code>, <code>reward</code> ต้องเป็นตัวเลข</td><td>warning</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-warning">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      track_evaluation ใช้ <strong>warning</strong> (ไม่หยุด) แทน error เพราะข้อมูลบางแถวอาจยังไม่สมบูรณ์ในช่วง RC Meeting
+    </div>
+  </div>
+
+  <h2>Database Schema — MSSQL</h2>
+  <p>ตาราง <code>track_evaluation</code> (schema: <code>dbo</code>) &nbsp;·&nbsp; MERGE key: product_code + publication_year + order_num + firstname + lastname + title</p>
+  <table>
+    <thead><tr><th>คอลัมน์</th><th>Type (MSSQL)</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td><code>product_code</code></td><td>NVARCHAR(50)</td><td>MERGE key</td></tr>
+      <tr><td><code>rc_meeting</code></td><td>NVARCHAR</td><td></td></tr>
+      <tr><td><code>publication_month</code></td><td>NVARCHAR</td><td>ชื่อเดือน เช่น January</td></tr>
+      <tr><td><code>order_num</code></td><td>Integer</td><td>ลำดับเดือน 1–12, MERGE key</td></tr>
+      <tr><td><code>publication_year</code></td><td>Integer</td><td>MERGE key</td></tr>
+      <tr><td><code>publication_date</code></td><td>Date</td><td></td></tr>
+      <tr><td><code>firstname</code></td><td>NVARCHAR(100)</td><td>MERGE key</td></tr>
+      <tr><td><code>lastname</code></td><td>NVARCHAR(100)</td><td>MERGE key</td></tr>
+      <tr><td><code>rank</code></td><td>NVARCHAR(100)</td><td></td></tr>
+      <tr><td><code>division</code></td><td>NVARCHAR(200)</td><td></td></tr>
+      <tr><td><code>description</code></td><td>NVARCHAR(500)</td><td></td></tr>
+      <tr><td><code>weight</code></td><td>DECIMAL(10,2)</td><td></td></tr>
+      <tr><td><code>quality</code></td><td>DECIMAL(10,2)</td><td></td></tr>
+      <tr><td><code>corresponding</code></td><td>NVARCHAR(10)</td><td>Yes / No / blank</td></tr>
+      <tr><td><code>contribution</code></td><td>DECIMAL(10,2)</td><td></td></tr>
+      <tr><td><code>score</code></td><td>DECIMAL(10,2)</td><td></td></tr>
+      <tr><td><code>reward</code></td><td>Integer</td><td>default 0</td></tr>
+      <tr><td><code>title</code></td><td>NVARCHAR(500)</td><td>MERGE key</td></tr>
+      <tr><td><code>source</code></td><td>NVARCHAR(255)</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">🔍</span>
+    <div class="callout-body">
+      MSSQL loader ตรวจ varchar length ก่อน insert ทุกครั้ง —
+      ถ้ามีข้อความยาวเกินกำหนด (<code>check_string_lengths</code>) จะ raise error และยกเลิก insert ทั้งชุด
+    </div>
+  </div>
+
+  <div class="page-footer">
+    seamless_data · Research Pipeline · อัปเดต 2026-06-07
+  </div>
+</main>
+
+<script>
+  function switchTab(btn, panelId) {
+    btn.closest('.tabs').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const parent = btn.closest('main') || document;
+    parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(panelId).classList.add('active');
+  }
+</script>
+</body>
+</html>
