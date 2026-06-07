@@ -45,6 +45,7 @@ _REQUIRED_COLS = [
     "sense_abc", "eric", "math_sci_net", "pubmed", "jstor", "project_muse",
     "other_inter", "tci_group1", "tci_group2", "national_journal",
     "product_code", "firstname", "lastname", "title", "field", "division", "source",
+    "volume", "issue", "pages",
     "publication_month", "publication_year", "publication_calendar_year",
     "publication_budget_year", "effective_date", "national_international",
 ] + [f"sdg{i}" for i in range(1, 18)]
@@ -52,6 +53,7 @@ _REQUIRED_COLS = [
 _STR_COLS = [
     "rank", "group_rank", "description", "product_code", "firstname", "lastname",
     "title", "field", "division", "source", "national_international",
+    "volume", "issue", "pages",
 ]
 
 

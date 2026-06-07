@@ -61,6 +61,7 @@ _COLUMN_ORDER = [
     "SENSE_ABC", "ERIC", "MathSciNet", "Pubmed", "JSTOR", "Project_Muse",
     "Other_Inter.Databases", "TCI_Group1", "TCI_Group2", "National_Journal", "Field",
     "division", "product_code", "firstname", "lastname", "title", "source",
+    "volume", "issue", "pages",
     "publication_month", "publication_year", "publication_calendar_year",
     "publication_budget_year", "effective_date", "national_international",
 ] + [f"sdg{i}" for i in range(1, 18)]
@@ -113,6 +114,9 @@ def run_template(input_path: str) -> Path:
         "lastname": raw_data["Lastname"],
         "title": raw_data["Title"],
         "source": raw_data["Journal/Conference/Source"],
+        "volume": raw_data["Volume"] if "Volume" in raw_data.columns else None,
+        "issue": raw_data["Issue"] if "Issue" in raw_data.columns else None,
+        "pages": raw_data["Pages"] if "Pages" in raw_data.columns else None,
     })
 
     template = template.reset_index(drop=True)

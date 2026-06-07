@@ -9,6 +9,9 @@ CREATE TABLE `muic-data-prod.Research.publications`
   lastname STRING NOT NULL OPTIONS (description="นามสกุลผู้เขียนคนแรก"),
   title STRING NOT NULL OPTIONS (description="ชื่อเรื่องของผลงาน"),
   source STRING OPTIONS (description="แหล่งที่มาของผลงาน เช่น วารสารหรือสำนักพิมพ์"),
+  volume STRING OPTIONS (description="เล่มที่ (Volume) ของวารสาร"),
+  issue STRING OPTIONS (description="ฉบับที่ (Issue) ของวารสาร"),
+  pages STRING OPTIONS (description="หน้าที่ตีพิมพ์ เช่น 1–15 หรือ 123"),
   national_international STRING OPTIONS (description="ระดับผลงาน: national หรือ international"),
   field STRING OPTIONS (description="สาขาวิชาหรือกลุ่มสาขาของผลงาน"),
   division STRING OPTIONS (description="หน่วยงาน / ภาควิชา / สำนักวิชา ที่สังกัดของผู้เขียน"),  -- ✅ เพิ่มใหม่
