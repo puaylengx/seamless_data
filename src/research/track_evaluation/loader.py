@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
@@ -190,3 +191,13 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     merge_job = bq.query(merge_sql)
     merge_job.result()
     logger.info("✅ Merge to %s completed", prod_table)
+
+
+def export_to_excel(df: pd.DataFrame, output_path: Path) -> Path:
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="track_evaluation")
+        ws = writer.sheets["track_evaluation"]
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+    logger.info("✅ Export สำเร็จ: %s", output_path)
+    return output_path

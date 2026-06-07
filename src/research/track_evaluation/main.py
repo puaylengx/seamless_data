@@ -1,7 +1,10 @@
 """
 Track evaluation pipeline
-Step 1 — template: raw Excel → draft template for review
-Step 2 — upload:  final template → MSSQL
+  template  — raw Excel → draft template for review
+  pipeline  — processed template → upload (via .env flags)
+  export    — processed template → final Excel
+  upload    — processed template → MSSQL
+  upload_bq — processed template → BigQuery
 """
 import logging
 import os
@@ -16,14 +19,16 @@ sys.path.append(str(Path(__file__).resolve().parents[3]))
 from helpers.logger import get_styled_logger
 from src.research.track_evaluation.transformer import build_track_template
 from src.research.track_evaluation.validator import validate_track_evaluation
-from src.research.track_evaluation.loader import load_to_mssql, load_to_bigquery
+from src.research.track_evaluation.loader import load_to_mssql, load_to_bigquery, export_to_excel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR      = PROJECT_ROOT / "logs" / "research" / "track_evaluation"
 TEMPLATE_DIR = PROJECT_ROOT / "data" / "research" / "track_evaluation" / "02_template"
+EXPORT_DIR   = PROJECT_ROOT / "data" / "research" / "track_evaluation" / "03_export"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = get_styled_logger(
     name=__name__,
@@ -123,6 +128,19 @@ def run_upload(input_path: str) -> None:
     logger.info("🏁 Upload complete")
 
 
+def run_export(input_path: str) -> Path:
+    logger.info("=" * 20 + " Start export → Excel " + "=" * 20)
+    logger.info("Input: %s", input_path)
+    df = pd.read_excel(input_path, engine="openpyxl")
+    logger.info("Read %d rows", len(df))
+    if not validate_track_evaluation(df):
+        logger.warning("⚠️ Validation พบข้อผิดพลาดบางส่วน")
+    output_path = EXPORT_DIR / f"track_evaluation_export_{datetime.now():%Y-%m-%d_%H-%M-%S}.xlsx"
+    result = export_to_excel(df, output_path)
+    logger.info("🏁 Export complete: %s", result)
+    return result
+
+
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "false").strip().lower() == "true"
 
@@ -197,6 +215,7 @@ def run_pipeline(input_path: str) -> None:
 _COMMANDS = {
     "template": run_template,
     "pipeline": run_pipeline,
+    "export": run_export,
     "upload": run_upload,
     "upload_bq": run_upload_bq,
 }
