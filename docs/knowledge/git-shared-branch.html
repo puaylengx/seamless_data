@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shared Branch — seamless_data</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px; line-height: 1.7;
+      color: #1a1a2e; background: #f5f6fa;
+    }
+
+    /* ── navbar ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #1a1a2e;
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 32px; height: 52px;
+    }
+    .navbar-brand { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: #7b8ab8; margin-right: 16px; white-space: nowrap; }
+    .navbar a { padding: 6px 12px; border-radius: 6px; color: #c8cfe8; text-decoration: none; font-size: 14px; white-space: nowrap; }
+    .navbar a:hover, .navbar a.active { background: #2d2f6b; color: #fff; }
+    .navbar-sep { color: #3d3f6b; margin: 0 4px; }
+
+    /* ── layout ── */
+    main { padding: 48px 56px; max-width: 960px; margin: 0 auto; }
+
+    /* ── typography ── */
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 40px 0 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e6f0; }
+    h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: #2d2f6b; }
+    p  { margin-bottom: 12px; color: #3a3d5c; }
+
+    /* ── table ── */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+    thead tr { background: #1a1a2e; color: #fff; }
+    thead th { padding: 10px 14px; text-align: left; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #eef0f8; }
+    tbody tr:hover { background: #dde2f3; }
+    td { padding: 9px 14px; border-bottom: 1px solid #e2e6f0; vertical-align: top; }
+    td code { background: #f0f2fc; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+    /* ── code block ── */
+    pre {
+      background: #1e2030; color: #cdd6f4;
+      padding: 20px 24px; border-radius: 10px;
+      overflow-x: auto; font-size: 13.5px; line-height: 1.6;
+      margin: 12px 0 24px;
+    }
+    pre .cm  { color: #6c7086; }
+    pre .cmd { color: #89b4fa; }
+    pre .str { color: #a6e3a1; }
+    pre .flag{ color: #fab387; }
+    pre .conflict-ours   { color: #89dceb; }
+    pre .conflict-theirs { color: #fab387; }
+    pre .conflict-marker { color: #f38ba8; font-weight: bold; }
+
+    /* ── callout ── */
+    .callout {
+      display: flex; gap: 12px; padding: 14px 18px;
+      border-radius: 8px; margin: 16px 0 24px; font-size: 14px;
+    }
+    .callout-info    { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .callout-warning { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .callout-tip     { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .callout-danger  { background: #fef2f2; border-left: 4px solid #ef4444; }
+    .callout-icon    { font-size: 18px; line-height: 1.4; }
+    .callout-body    { color: #374151; }
+    .callout-body strong { color: #111827; }
+
+    /* ── person cards ── */
+    .person-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 16px 0 28px; }
+    .person-card { background: #fff; border: 2px solid #e2e6f0; border-radius: 10px; padding: 16px; }
+    .person-card h3 { margin: 0 0 6px; font-size: 14px; }
+    .person-card.a { border-color: #818cf8; }
+    .person-card.b { border-color: #34d399; }
+    .person-card.c { border-color: #fbbf24; }
+    .person-card code { font-size: 12px; color: #4b5563; }
+
+    /* ── conflict block ── */
+    .conflict-box {
+      background: #1e2030; border-radius: 10px;
+      padding: 20px 24px; margin: 12px 0 24px;
+      font-family: monospace; font-size: 13.5px; line-height: 2;
+      overflow-x: auto; color: #cdd6f4;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .conflict-box .conflict-marker { color: #f38ba8; font-weight: bold; }
+    .conflict-box .conflict-ours   { color: #89dceb; }
+    .conflict-box .conflict-theirs { color: #fab387; }
+    .conflict-box .conflict-note   { color: #6c7086; margin-left: 10px; font-size: 12px; }
+
+    /* ── team flow ── */
+    .team-flow {
+      background: #1e2030; border-radius: 12px;
+      padding: 24px; margin: 16px 0 24px; overflow-x: auto;
+    }
+    .team-flow-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 20px; padding-bottom: 14px;
+      border-bottom: 1px solid #313450;
+    }
+    .team-flow-header .branch-pill {
+      background: #1e3a5f; color: #89b4fa;
+      font-family: monospace; font-size: 13px; font-weight: 700;
+      padding: 4px 14px; border-radius: 20px; border: 2px solid #89b4fa;
+    }
+    .team-flow-header .branch-subtitle { font-size: 12px; color: #6c7086; }
+
+    .team-rows { display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px; }
+    .team-row { display: flex; align-items: center; gap: 0; min-height: 44px; }
+
+    .tr-person {
+      width: 64px; flex-shrink: 0;
+      font-size: 12px; font-weight: 700; font-family: monospace;
+      padding: 6px 10px 6px 0;
+    }
+    .tr-person.a { color: #818cf8; }
+    .tr-person.b { color: #34d399; }
+    .tr-person.c { color: #fbbf24; }
+
+    .tr-timeline { display: flex; align-items: center; gap: 0; flex: 1; }
+
+    .tr-action {
+      padding: 5px 12px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+    }
+    .tr-action.pull   { background: #1e3a5f; color: #89b4fa; }
+    .tr-action.file   { background: #1a3828; color: #a6e3a1; font-family: monospace; }
+    .tr-action.commit { background: #2d1a5f; color: #cba6f7; }
+    .tr-action.push   { background: #3a2510; color: #fab387; }
+
+    .tr-sep {
+      width: 24px; height: 2px; background: #3d4060; margin: 0 2px; flex-shrink: 0;
+      position: relative;
+    }
+    .tr-sep::after {
+      content: ''; position: absolute; right: -5px; top: -4px;
+      border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+      border-left: 6px solid #3d4060;
+    }
+
+    .team-flow-footer {
+      display: flex; align-items: center; gap: 10px;
+      padding-top: 16px; border-top: 1px solid #313450;
+    }
+    .team-flow-footer .merge-arrow {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: #6c7086;
+    }
+    .team-flow-footer .merge-arrow .arrow-line {
+      width: 40px; height: 2px; background: #89b4fa; position: relative;
+    }
+    .team-flow-footer .merge-arrow .arrow-line::after {
+      content: ''; position: absolute; right: -5px; top: -4px;
+      border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+      border-left: 6px solid #89b4fa;
+    }
+    .team-flow-footer .main-pill {
+      background: #1e3a5f; color: #89b4fa;
+      font-family: monospace; font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: 20px; border: 1px solid #89b4fa;
+    }
+    .team-flow-footer .footer-note { font-size: 12px; color: #6c7086; }
+
+    /* ── step list ── */
+    .steps { counter-reset: step; list-style: none; padding: 0; margin: 16px 0 24px; }
+    .steps li { counter-increment: step; display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px solid #e2e6f0; }
+    .steps li:last-child { border-bottom: none; }
+    .step-num { flex-shrink: 0; width: 28px; height: 28px; background: #1a1a2e; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+    .step-body { flex: 1; }
+    .step-body strong { display: block; margin-bottom: 4px; }
+
+    /* ── footer ── */
+    .page-footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e6f0; font-size: 13px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="navbar-brand">seamless_data</span>
+  <a href="../database.html">Database Connection</a>
+  <span class="navbar-sep">/</span>
+  <a href="git-workflow.html">Git Workflow</a>
+  <a href="git-shared-branch.html" class="active">Shared Branch</a>
+</nav>
+
+<main>
+  <h1>Shared Branch</h1>
+  <p>แนวทางการทำงานเมื่อหลายคนใช้ branch เดียวกัน โดยเฉพาะกรณี <code>docs/knowledge</code> ที่หลายคน update ไฟล์ <code>*.html</code> พร้อมกัน</p>
+
+  <!-- ── context ── -->
+  <h2>สถานการณ์</h2>
+
+  <div class="person-grid">
+    <div class="person-card a">
+      <h3>คน A</h3>
+      <code>docs/knowledge/database.html</code>
+    </div>
+    <div class="person-card b">
+      <h3>คน B</h3>
+      <code>docs/knowledge/finance.html</code>
+    </div>
+    <div class="person-card c">
+      <h3>คน C</h3>
+      <code>docs/knowledge/research.html</code>
+    </div>
+  </div>
+
+  <p>ทุกคนทำงานบน branch <code>docs/knowledge</code> เดียวกัน แต่รับผิดชอบคนละไฟล์ — วิธีนี้ลดโอกาสเกิด conflict ได้มากที่สุด</p>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body"><strong>หลักการ:</strong> แบ่งงานให้แต่ละคนรับผิดชอบ <strong>คนละไฟล์</strong> — ถ้าไม่ได้จริงๆ ค่อย resolve conflict ตามขั้นตอนด้านล่าง</div>
+  </div>
+
+  <!-- ── daily workflow ── -->
+  <h2>ขั้นตอน "Pull before Push" — ทำทุกครั้งก่อนเริ่มงาน</h2>
+
+  <ul class="steps">
+    <li>
+      <span class="step-num">1</span>
+      <div class="step-body">
+        <strong>Switch ไป branch และ pull งานล่าสุด</strong>
+        <pre><span class="cmd">git checkout</span> docs/knowledge
+<span class="cmd">git pull</span> origin docs/knowledge</pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">2</span>
+      <div class="step-body">
+        <strong>แก้ไฟล์ของตัวเอง</strong>
+        <pre><span class="cm"># แก้ไฟล์ที่ตัวเองรับผิดชอบ เช่น database.html</span></pre>
+      </div>
+    </li>
+    <li>
+      <span class="step-num">3</span>
+      <div class="step-body">
+        <strong>Commit และ push</strong>
+        <pre><span class="cmd">git add</span> docs/knowledge/database.html
+<span class="cmd">git commit</span> <span class="flag">-m</span> <span class="str">"docs(db): update navbar to top layout"</span>
+<span class="cmd">git push</span> origin docs/knowledge</pre>
+      </div>
+    </li>
+  </ul>
+
+  <!-- ── flow ── -->
+  <h2>Flow ของทั้ง 3 คน</h2>
+
+  <div class="team-flow">
+    <div class="team-flow-header">
+      <span class="branch-pill">docs/knowledge</span>
+      <span class="branch-subtitle">shared branch — ทุกคนทำงานร่วมกันบน branch นี้</span>
+    </div>
+
+    <div class="team-rows">
+      <!-- คน A -->
+      <div class="team-row">
+        <div class="tr-person a">คน A</div>
+        <div class="tr-timeline">
+          <span class="tr-action pull">pull</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action file">database.html</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action commit">commit</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action push">push</span>
+        </div>
+      </div>
+      <!-- คน B -->
+      <div class="team-row">
+        <div class="tr-person b">คน B</div>
+        <div class="tr-timeline">
+          <span class="tr-action pull">pull</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action file">finance.html</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action commit">commit</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action push">push</span>
+        </div>
+      </div>
+      <!-- คน C -->
+      <div class="team-row">
+        <div class="tr-person c">คน C</div>
+        <div class="tr-timeline">
+          <span class="tr-action pull">pull</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action file">research.html</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action commit">commit</span>
+          <div class="tr-sep"></div>
+          <span class="tr-action push">push</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-flow-footer">
+      <div class="merge-arrow">
+        <span style="color:#6c7086;font-size:12px">merge เข้า</span>
+        <div class="arrow-line"></div>
+      </div>
+      <span class="main-pill">main</span>
+      <span class="footer-note">เมื่อทุกคนพร้อม</span>
+    </div>
+  </div>
+
+  <!-- ── conflict ── -->
+  <h2>เมื่อเกิด Conflict</h2>
+
+  <p>เกิดขึ้นเมื่อ 2 คนแก้ <strong>ไฟล์เดียวกัน บรรทัดเดียวกัน</strong> แล้ว push ต่างเวลากัน</p>
+
+  <h3>1. Pull แล้วพบ conflict</h3>
+  <pre><span class="cmd">git pull</span> origin docs/knowledge
+<span class="cm"># ขึ้น: CONFLICT (content): Merge conflict in docs/knowledge/database.html</span></pre>
+
+  <h3>2. เปิดไฟล์ที่ conflict — จะเห็น marker แบบนี้</h3>
+  <div class="conflict-box">
+    <span><span class="conflict-marker">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</span><span class="conflict-note">(งานของเรา)</span></span>
+    <span class="conflict-ours">&lt;nav class="navbar"&gt;</span>
+    <span class="conflict-marker">=======</span>
+    <span class="conflict-theirs">&lt;nav class="sidebar"&gt;</span>
+    <span><span class="conflict-marker">&gt;&gt;&gt;&gt;&gt;&gt;&gt; origin/docs/knowledge</span><span class="conflict-note">(งานของคนอื่น)</span></span>
+  </div>
+
+  <h3>3. แก้ไขให้เหลือแบบที่ถูกต้อง แล้ว commit</h3>
+  <pre><span class="cm"># ลบ marker ออก เหลือเฉพาะโค้ดที่ต้องการ</span>
+<span class="cmd">git add</span> docs/knowledge/database.html
+<span class="cmd">git commit</span> <span class="flag">-m</span> <span class="str">"docs: resolve conflict in database.html navbar"</span>
+<span class="cmd">git push</span> origin docs/knowledge</pre>
+
+  <div class="callout callout-warning">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">ห้าม commit ไฟล์ที่ยังมี <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> หรือ <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> อยู่ — ต้องแก้ให้หมดก่อนเสมอ</div>
+  </div>
+
+  <!-- ── merge to main ── -->
+  <h2>Merge เข้า main เมื่อทุกคนพร้อม</h2>
+
+  <pre><span class="cmd">git checkout</span> main
+<span class="cmd">git pull</span> origin main
+<span class="cmd">git merge</span> docs/knowledge
+<span class="cmd">git push</span> origin main
+
+<span class="cm"># ลบ branch หลัง merge (ถ้าไม่ใช้แล้ว)</span>
+<span class="cmd">git branch</span> <span class="flag">-d</span> docs/knowledge
+<span class="cmd">git push</span> origin <span class="flag">--delete</span> docs/knowledge</pre>
+
+  <!-- ── tips ── -->
+  <h2>Tips ลด Conflict</h2>
+
+  <table>
+    <thead><tr><th>วิธี</th><th>รายละเอียด</th></tr></thead>
+    <tbody>
+      <tr><td>แบ่งไฟล์คนละส่วน</td><td>แต่ละคนรับผิดชอบคนละไฟล์ — conflict จะไม่เกิดเลย</td></tr>
+      <tr><td>pull ก่อนเริ่มทำงานทุกครั้ง</td><td>ลดระยะห่างระหว่าง local กับ remote</td></tr>
+      <tr><td>commit ทีละน้อย push บ่อยๆ</td><td>conflict มีขอบเขตเล็ก แก้ง่ายกว่า</td></tr>
+      <tr><td>สื่อสารในทีม</td><td>แจ้งเพื่อนก่อนแก้ไฟล์ที่ใช้ร่วมกัน</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">ℹ️</span>
+    <div class="callout-body"><strong>ดู Git Workflow หลัก</strong> ได้ที่ <a href="git-workflow.html">git-workflow.html</a> — ครอบคลุม branch naming, solo workflow และ commit message</div>
+  </div>
+
+  <div class="page-footer">seamless_data — Shared Branch</div>
+</main>
+</body>
+</html>
