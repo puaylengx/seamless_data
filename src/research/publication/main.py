@@ -1,9 +1,9 @@
 """
 Publication pipeline
-  check_value — raw Excel → draft template for review
-  upload_mssql — processed template → MSSQL
-  upload_bq    — processed template → BigQuery
-  export       — processed template → final Excel
+  template  — raw Excel → draft template for review
+  pipeline  — processed template → export Excel + upload (via .env flags)
+  upload    — processed template → MSSQL
+  upload_bq — processed template → BigQuery
 """
 import logging
 import os
@@ -95,8 +95,8 @@ def _process_clean(raw_data: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([df, sdg_df], axis=1)
 
 
-def run(input_path: str) -> Path:
-    logger.info("=" * 20 + " Start check_value " + "=" * 20)
+def run_template(input_path: str) -> Path:
+    logger.info("=" * 20 + " Start template " + "=" * 20)
     logger.info("Input: %s", input_path)
 
     raw_data = pd.read_excel(input_path, engine="openpyxl")
@@ -135,7 +135,7 @@ def run(input_path: str) -> Path:
     return output_path
 
 
-def run_upload_mssql(input_path: str) -> None:
+def run_upload(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → MSSQL " + "=" * 20)
     logger.info("Input: %s", input_path)
     df = pd.read_excel(input_path, engine="openpyxl")
@@ -225,11 +225,11 @@ def run_pipeline(input_path: str) -> None:
 
 
 _COMMANDS = {
-    "check_value": (run, "<raw_excel_path>"),
-    "pipeline": (run_pipeline, "<processed_template_path>"),
-    "export": (run_export, "<processed_template_path>"),
-    "upload_mssql": (run_upload_mssql, "<processed_template_path>"),
-    "upload_bq": (run_upload_bq, "<processed_template_path>"),
+    "template": run_template,
+    "pipeline": run_pipeline,
+    "export": run_export,
+    "upload": run_upload,
+    "upload_bq": run_upload_bq,
 }
 
 if __name__ == "__main__":
@@ -241,4 +241,4 @@ if __name__ == "__main__":
     if cmd not in _COMMANDS:
         print(f"Unknown command: '{cmd}'. Available: {list(_COMMANDS)}")
         sys.exit(1)
-    _COMMANDS[cmd][0](path)
+    _COMMANDS[cmd](path)
