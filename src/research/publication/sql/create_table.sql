@@ -14,7 +14,7 @@ CREATE TABLE `muic-data-prod.Research.publications`
   pages STRING OPTIONS (description="หน้าที่ตีพิมพ์ เช่น 1–15 หรือ 123"),
   national_international STRING OPTIONS (description="ระดับผลงาน: national หรือ international"),
   field STRING OPTIONS (description="สาขาวิชาหรือกลุ่มสาขาของผลงาน"),
-  division STRING OPTIONS (description="หน่วยงาน / ภาควิชา / สำนักวิชา ที่สังกัดของผู้เขียน"),  -- ✅ เพิ่มใหม่
+  division STRING OPTIONS (description="หน่วยงาน / ภาควิชา / สำนักวิชา ที่สังกัดของผู้เขียน"),
 
   -- 🔹 วันที่และปีที่เผยแพร่
   effective_date DATE OPTIONS (description="วันที่มีผลหรือวันที่เผยแพร่จริง"),
