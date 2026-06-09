@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 _EXCEL_ROW_OFFSET = 2  # header row 1, data starts at row 2
 
 _NON_NULLABLE = [
-    "rank", "group_rank", "description", "product_code", "firstname", "lastname", "title",
+    "rank", "product_code", "firstname", "lastname", "title",
 ]
 
 _FLAG_COLS = [
@@ -15,7 +15,9 @@ _FLAG_COLS = [
     "sense_abc",  # Fix: was missing from backup's excel_to_mssql.py
     "eric", "math_sci_net", "pubmed", "jstor", "project_muse", "other_inter",
     "tci_group1", "tci_group2", "national_journal",
-] + [f"sdg{i}" for i in range(1, 18)]
+]
+
+_SDG_COLS = [f"sdg{i}" for i in range(1, 18)]
 
 _YEAR_COLS = ["publication_year", "publication_calendar_year", "publication_budget_year"]
 
@@ -64,17 +66,29 @@ def validate_publication(df: pd.DataFrame) -> bool:
             logger.warning("Column '%s' มีค่าไม่ใช่ 0/1 ที่ Excel rows: %s", col, rows)
             ok = False
 
+    for col in _SDG_COLS:
+        if col not in df.columns:
+            logger.warning("Column '%s' ไม่พบใน DataFrame — ข้ามตรวจสอบ", col)
+            continue
+        non_null = df[col].dropna()
+        mask = ~non_null.isin([0, 1])
+        if mask.any():
+            rows = (non_null.index[mask] + _EXCEL_ROW_OFFSET).tolist()
+            logger.warning("Column '%s' มีค่าไม่ใช่ 0/1/null ที่ Excel rows: %s", col, rows)
+            ok = False
+
     invalid_rows = []
     for idx, val in df["effective_date"].items():
+        if pd.isna(val):
+            continue
         try:
-            parsed = pd.to_datetime(val, errors="raise")
-            df.at[idx, "effective_date"] = parsed.date()
+            pd.to_datetime(val, errors="raise")
         except Exception:
             invalid_rows.append(idx + _EXCEL_ROW_OFFSET)
     if invalid_rows:
-        logger.warning("effective_date แปลงเป็น datetime ไม่ได้ที่ Excel rows: %s", invalid_rows)
+        logger.warning("effective_date แปลงเป็น date ไม่ได้ที่ Excel rows: %s", invalid_rows)
         ok = False
     else:
-        logger.info("แปลง effective_date เป็นรูปแบบวันที่สำเร็จ %d แถว", len(df))
+        logger.info("effective_date ตรวจสอบผ่านทั้งหมด %d แถว", len(df))
 
     return ok
