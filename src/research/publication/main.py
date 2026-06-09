@@ -28,7 +28,7 @@ from src.research.publication.transformer import (
     get_extract_sdg_values,
 )
 from src.research.publication.validator import validate_publication
-from src.research.publication.loader import load_to_mssql, load_to_bigquery, export_to_excel
+from src.research.publication.loader import load_to_mssql, load_to_bigquery, export_to_excel, _RENAME_MAP
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR      = PROJECT_ROOT / "logs" / "research" / "publication" / "check_value"
@@ -56,10 +56,10 @@ _DB_KEYS = [
 _COLUMN_ORDER = [
     "rank", "group_rank", "description",
     "Database (WoS, Scopus, TCI)",
-    "WoS_with_JIF-P90", "WoS_with_JIF", "WoS_SC", "WoS_SS", "WoS_AH", "WoS_ES",
-    "Scopus_SJR-10", "Scopus_Q1", "Scopus_Q2", "Scopus_Q3", "Scopus_Q4", "Scopus_No_Q",
-    "SENSE_ABC", "ERIC", "MathSciNet", "Pubmed", "JSTOR", "Project_Muse",
-    "Other_Inter.Databases", "TCI_Group1", "TCI_Group2", "National_Journal", "Field",
+    "wos_with_jif_p90", "wos_with_jif", "wos_sc", "wos_ss", "wos_ah", "wos_es",
+    "scopus_sjr_10", "scopus_q1", "scopus_q2", "scopus_q3", "scopus_q4", "scopus_no_q",
+    "sense_abc", "eric", "math_sci_net", "pubmed", "jstor", "project_muse",
+    "other_inter", "tci_group1", "tci_group2", "national_journal", "field",
     "division", "product_code", "firstname", "lastname", "title", "source",
     "volume", "issue", "pages",
     "publication_month", "publication_year", "publication_calendar_year",
@@ -124,6 +124,7 @@ def run_template(input_path: str) -> Path:
     clean_data = clean_data.reset_index(drop=True)
 
     df_combined = pd.concat([template, db_data, clean_data], axis=1)
+    df_combined = df_combined.rename(columns=_RENAME_MAP)
 
     for col in _COLUMN_ORDER:
         if col not in df_combined.columns:
