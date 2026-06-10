@@ -23,7 +23,9 @@ def read_table(mdb_path: str | Path, table_name: str) -> pd.DataFrame:
         ["mdb-export", str(mdb_path), table_name],
         capture_output=True, text=True, check=True,
     )
-    return pd.read_csv(io.StringIO(result.stdout))
+    df = pd.read_csv(io.StringIO(result.stdout))
+    df.columns = df.columns.str.lower()
+    return df
 
 
 def extract_all(mdb_path: str | Path) -> dict[str, pd.DataFrame]:
