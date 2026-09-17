@@ -83,18 +83,19 @@ def prepare_for_load(df: pd.DataFrame) -> pd.DataFrame:
     เตรียม DataFrame (หลัง coerce_and_clean + validate) ให้พร้อมเขียน — **ตัวเดียวสำหรับทั้ง MSSQL และ BigQuery** (G4)
 
     เดิม MSSQL ทำ strip/blank→None inline ส่วน BigQuery มี prep แยกของตัวเอง (ไม่ strip) → สอง DB ได้ค่าต่างกัน
-      - text: strip whitespace, ค่าว่าง → None
+      - text: strip whitespace, ค่าว่าง → null  (dtype "string" — เหมือน BigQuery path เดิม)
       - int:  order_num / publication_year / reward → Int64 (nullable)
       - float: weight / quality / contribution / score
       - publication_date → date object
-    คืน DataFrame ใหม่ ไม่แก้ตัวที่รับเข้ามา; ทุก null เป็น None (ไม่ใช่ NaN/NA) ให้ driver ทั้งสองรับได้เหมือนกัน
+    คืน DataFrame ใหม่ ไม่แก้ตัวที่รับเข้ามา — **คง typed dtypes ไว้** เพราะ BigQuery load ผ่าน pyarrow
+    รับ Int64/string อยู่แล้ว (พฤติกรรมเดิมที่พิสูจน์แล้วบน prod); MSSQL path แปลงเป็น object/None เองใน
+    _for_pyodbc() ก่อนส่ง psycopg2/pyodbc (ทำเฉพาะที่นั่น ไม่ใช่ที่นี่ — ตัดสินใจ 2026-09-17 ใน PR #9)
     """
     df = df.copy()
     for col in _TEXT_COLS:
         if col in df.columns:
-            df[col] = df[col].astype(object).map(
-                lambda x: None if pd.isna(x) or str(x).strip() == "" else str(x).strip()
-            )
+            stripped = df[col].astype("string").str.strip()
+            df[col] = stripped.mask(stripped == "", pd.NA)
     for col in _INT_COLS:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
@@ -103,6 +104,11 @@ def prepare_for_load(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     if "publication_date" in df.columns:
         df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
+    return df
+
+
+def _for_pyodbc(df: pd.DataFrame) -> pd.DataFrame:
+    """MSSQL เท่านั้น: ทุก null → None และ dtype → object ให้ pyodbc/to_sql รับได้ (พฤติกรรมเดิมของ MSSQL path)"""
     return df.astype(object).where(pd.notnull(df), None)
 
 
@@ -128,7 +134,7 @@ def _bq_tables() -> tuple[str, str]:
 
 
 def load_to_mssql(df: pd.DataFrame) -> None:
-    df = prepare_for_load(df)
+    df = _for_pyodbc(prepare_for_load(df))
     engine = _mssql_engine()
     logger.info("เชื่อมต่อฐานข้อมูลสำเร็จ")
 

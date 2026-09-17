@@ -9,7 +9,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 import src.research.track_evaluation.loader as loader_mod
-from src.research.track_evaluation.loader import MERGE_KEYS, bq_summary, mssql_summary, prepare_for_load
+from src.research.track_evaluation.loader import MERGE_KEYS, _for_pyodbc, bq_summary, mssql_summary, prepare_for_load
 from src.research.track_evaluation.transformer import coerce_and_clean
 
 
@@ -27,29 +27,38 @@ def _cleaned(**overrides) -> pd.DataFrame:
 
 # ── prepare_for_load ──────────────────────────────────────────────────────────
 
-def test_prepare_strips_text_and_blank_becomes_none():
+def test_prepare_strips_text_and_blank_becomes_null_keeping_string_dtype():
     out = prepare_for_load(_cleaned())
     assert out["product_code"].iloc[0] == "P-001"
-    assert out["division"].iloc[0] is None
-    print("✅ text strip, ว่าง → None")
+    assert pd.isna(out["division"].iloc[0])
+    assert str(out["product_code"].dtype) == "string"       # typed เหมือน BigQuery path เดิม
+    print("✅ text strip, ว่าง → null, dtype string คงไว้")
 
 
-def test_prepare_numeric_and_date_types():
+def test_prepare_numeric_and_date_types_are_typed():
     out = prepare_for_load(_cleaned())
-    assert out["order_num"].iloc[0] == 3 and out["publication_year"].iloc[0] == 2026
+    assert str(out["order_num"].dtype) == "Int64" and out["order_num"].iloc[0] == 3
+    assert str(out["publication_year"].dtype) == "Int64" and out["publication_year"].iloc[0] == 2026
     assert out["reward"].iloc[0] == 0                       # reward ว่าง → 0 มาจาก coerce_and_clean (PD-2)
-    assert out["contribution"].iloc[0] is None              # float ว่าง → None ไม่ใช่ NaN
+    assert pd.isna(out["contribution"].iloc[0])             # float ว่าง → NaN (typed)
     assert out["quality"].iloc[0] == 0.76
     assert out["publication_date"].iloc[0] == date(2026, 3, 15)
 
 
-def test_prepare_returns_new_frame_and_all_nulls_are_none():
+def test_prepare_returns_new_frame():
     src = _cleaned()
     snap = src.copy(deep=True)
-    out = prepare_for_load(src)
+    prepare_for_load(src)
     pd.testing.assert_frame_equal(src, snap)
-    assert not any(v is not None and pd.isna(v) for v in out.iloc[0].tolist())
-    print("✅ ไม่ mutate input; null ทุกตัวเป็น None")
+
+
+def test_for_pyodbc_turns_every_null_into_none_mssql_only():
+    out = _for_pyodbc(prepare_for_load(_cleaned()))
+    row = out.iloc[0].tolist()
+    assert out["division"].iloc[0] is None and out["contribution"].iloc[0] is None
+    assert not any(v is not None and pd.isna(v) for v in row)   # ไม่มี NaN/NA เหลือ
+    assert out["product_code"].iloc[0] == "P-001" and out["order_num"].iloc[0] == 3
+    print("✅ MSSQL path: null ทุกตัว → None, ค่าเท่ากับ prepare_for_load")
 
 
 def test_load_to_mssql_goes_through_prepare_for_load(monkeypatch):
