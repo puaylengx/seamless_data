@@ -89,6 +89,7 @@
 | Data modeling | Kimball dimensional modeling | แยก fact/dimension เมื่อ reporting ซับซ้อนขึ้น |
 | Config management | 12-Factor App (config in environment) | ทุก credential/setting ผ่าน `.env` ไม่ hardcode |
 | Version control | Conventional Commits + trunk-based/feature-branch flow | ตาม git-workflow ที่ทีมมีอยู่แล้ว |
+| Commit messages | Conventional Commits (`type(scope): subject`) | อ้างเลข gap ถ้าเกี่ยว; **ห้ามมี trailer `Co-Authored-By:` ที่ระบุ Claude/AI ใดๆ** ในทุก commit (กฎถาวร ตั้งแต่ 2026-09-17) |
 | Data quality | DAMA-DMBOK data quality dimensions | completeness, accuracy, consistency, timeliness, uniqueness |
 | Security | OWASP Top 10 (สำหรับ API/dashboard), Principle of Least Privilege | DB role แยกสิทธิ์, secret management, RBAC ก่อนขึ้น dashboard |
 | Testing | Test pyramid (unit > integration > e2e) | unit test ต่อ extractor/transformer/validator เป็นฐาน |
