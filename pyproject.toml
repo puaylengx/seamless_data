@@ -1,0 +1,39 @@
+[project]
+name = "seamless_data"
+version = "0.1.0"
+description = "Data pipeline (Finance / Research / Zeal Data) → PostgreSQL / MSSQL / BigQuery → dashboard"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = { find = { include = ["src*", "helpers*", "migrations*"] } }
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider -m 'not integration'"
+markers = [
+    "integration: ต้องต่อ DB/SSH จริง — ไม่รันใน unit suite และ CI (รันเองด้วย -m integration)",
+]
+filterwarnings = [
+    # paramiko ยังใช้ TripleDES จาก cryptography — ไม่ใช่ปัญหาของโค้ดเรา
+    "ignore:TripleDES has been moved:DeprecationWarning",
+    "ignore:TripleDES has been moved:cryptography.utils.CryptographyDeprecationWarning",
+]
+
+# ── ruff (lint only — ไม่ใช้ formatter เพื่อไม่ทำลาย alignment ของ mapping dict) ──
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = [".venv", "data", "logs", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long — มี SQL/log message ยาวจำนวนมาก
+    "E402",  # module import not at top — pattern sys.path.append(...) ก่อน import src/helpers
+]

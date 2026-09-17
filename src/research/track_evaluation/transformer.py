@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from src.research.publication.transformer import (  # re-export shared functions
+from src.research.publication.transformer import (  # noqa: F401 — re-export shared functions
     get_rank,
     get_parse_database_data,
     get_clean_publication_month,

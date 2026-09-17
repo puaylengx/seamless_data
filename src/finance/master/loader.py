@@ -71,7 +71,7 @@ class MasterLoader:
         if table_name not in _TABLE_COLUMNS:
             raise ValueError(f"ไม่รู้จัก table '{table_name}'\nที่รองรับ: {list(_TABLE_COLUMNS)}")
         if mode not in ("append", "replace"):
-            raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace'")
+            raise ValueError("mode ต้องเป็น 'append' หรือ 'replace'")
         if mode == "replace":
             ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{table_name}"')
 
