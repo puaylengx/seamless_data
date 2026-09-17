@@ -15,7 +15,7 @@ def test_erp_column_mapping():
     """ERP_COLUMNS ต้องครบทุก column ที่กำหนดใน requirement"""
     required = {
         "Year", "Trimester", "Day", "Month", "DocNo", "DocDate",
-        "FundsCtr", "CostCtr_ID", "Cost_Owner", "IO_Goods", "IO_Work",
+        "FundsCtr", "CostCtr_ID", "Cost_Owner", "CostNote", "IO_Goods", "IO_Work",
         "IO_Activity", "IO_Project", "Order_Description", "HROT",
         "GL_ID", "GL_Description", "Amount", "Details", "MU_Strategy", "IC_Strategy",
     }
