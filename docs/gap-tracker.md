@@ -9,11 +9,11 @@
 | Phase | เสร็จ | กำลังทำ | ยังไม่เริ่ม | blocked บางส่วน |
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
-| Phase 1 | 1/5 (G1 ✅ PR #6 merged `99f8759`) | — | 4 | G4 (PD-4), G7 (PD-5) |
+| Phase 1 | 1/5 (G1 ✅ PR #6 merged `99f8759`) | G4 (PR #9) | 3 | G4 SoT (PD-4), G7 (PD-5) |
 | Phase 2 | 0/8 | — | 8 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8) |
 | Phase 3 | 1/6 (G20 ✅ PR #6) | — | 5 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-17 (G1/G20 merged; เพิ่ม G21)_
+_อัปเดตล่าสุด: 2026-09-17 (G4 → PR #9)_
 
 ---
 
@@ -27,7 +27,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G1/G20 merged; เพิ่�
 ## Phase 1 — ปิด critical/high ด้าน quality + security (Sprint 1–2)
 
 - [x] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) merged `99f8759` — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
-- [ ] **G4** 🟠 · Data layering · [Pipeline] ✋ shared prepare สำหรับ MSSQL/BQ + reconciliation step (row count / per-year) · 🔒 ประกาศ source of truth รอ PD-4
+- [~] **G4** 🟠 · Data layering · [Pipeline + QA] [PR #9](https://github.com/puaylengx/seamless_data/pull/9) รอ review — `prepare_for_load()` ตัวเดียวสำหรับ MSSQL/BQ (track_evaluation), `src/research/reconcile.py` (rows/distinct key ต่อปี, prepared vs ปลายทาง, MSSQL ⇄ BQ) เรียกหลังทุก upload ทั้งสอง pipeline; +22 tests (110 → 132) · 🔒 ประกาศ source of truth รอ PD-4 — reconcile จึงแค่ WARNING ไม่ raise
 - [ ] **G7** 🟠 · Security (Least Privilege) · [Security] ✋ `TRUNCATE` → `DELETE FROM`, เขียน `docs/db-roles.md` (`etl_writer` / `schema_owner`) · 🔒 ตรวจ grant จริงรอ PD-5 (DBA)
 - [ ] **G16** 🟡 · Security · [Security] ✋ pre-commit + gitleaks, ย้าย SA JSON ออกนอก repo tree, `sqlalchemy.URL.create()` แทน f-string password
 - [ ] **G6** 🟠 · Data modeling · [Architect] ✋ ตาราง `schema_migrations` + `--dry-run` ใน `migrations/migrate.py`; ย้าย BQ DDL / reverse-engineer MSSQL schema เข้า `migrations/research/`
