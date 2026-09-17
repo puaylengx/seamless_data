@@ -24,10 +24,10 @@ def _df(years):
     return pd.DataFrame(rows)
 
 
-def _fake(label, per_year):
+def _fake(label, per_year, distinct=None):
     def fetch(years):
         fetch.years = years
-        return Summary(label, sum(per_year.values()), per_year, per_year)
+        return Summary(label, sum(per_year.values()), per_year, distinct or per_year)
     return fetch
 
 
@@ -46,7 +46,7 @@ def test_reconcile_ok_when_both_destinations_match(monkeypatch, caplog):
 
 def test_reconcile_flags_mssql_duplicates_but_does_not_raise(monkeypatch, caplog):
     df = _df([2024, 2024])
-    monkeypatch.setattr(main_mod, "mssql_summary", _fake("MSSQL", {2024: 4}))   # append รันซ้ำ
+    monkeypatch.setattr(main_mod, "mssql_summary", _fake("MSSQL", {2024: 4}, {2024: 2}))   # append รันซ้ำ: 4 แถว 2 key
     with caplog.at_level(logging.WARNING, logger="src.research.reconcile"):
         assert main_mod.reconcile(df, mssql=True, bq=False) is False
     assert "ซ้ำ" in caplog.text

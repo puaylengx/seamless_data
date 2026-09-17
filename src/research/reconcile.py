@@ -4,7 +4,7 @@ Reconciliation check ระหว่าง "สิ่งที่ pipeline เ�
 ใช้ร่วมกันทั้ง publication และ track_evaluation:
   1. summarize()            — สรุป DataFrame ที่ prepare แล้ว: rows / rows ต่อปี / distinct key ต่อปี
   2. fetch_summary_sql()    — สรุปแบบเดียวกันจากปลายทาง (MSSQL หรือ BigQuery) ผ่าน executor ที่ loader ส่งมา
-  3. compare()              — expected (prepared) vs actual (ปลายทาง)  → log WARNING เมื่อไม่ตรง
+  3. compare()              — batch ที่เขียน vs ปลายทาง → WARNING เมื่อหาย หรือปลายทางมีแถวซ้ำ key (rows > distinct)
   4. compare_destinations() — MSSQL vs BigQuery ต่อกันเอง → ตรวจว่าสอง DB ยัง sync กัน
 
 เจตนา: **ตรวจแล้วบอก** ไม่ใช่ตัดสิน — ปลายทางไหนเป็น source of truth ยังรอ PD-4
@@ -107,23 +107,32 @@ def fetch_summary_sql(
 
 def compare(expected: Summary, actual: Summary) -> ReconcileResult:
     """
-    prepared (expected) vs ปลายทาง (actual) ทีละปี:
-      actual < expected → แถวหาย
-      actual > expected → มีมากกว่าที่เพิ่งเขียน (เช่น MSSQL append รันซ้ำ → แถวซ้ำ)
-      distinct ต่างกัน  → key ชุดไม่ตรง
+    prepared (batch ที่เพิ่งเขียน) vs ปลายทาง ทีละปี — ออกแบบให้ **ไม่เตือนผิด** เมื่อทยอย upload
+    หลายชุดในปีเดียวกันโดยตั้งใจ (ปลายทางย่อมมีแถวสะสมมากกว่า batch นี้ → แค่ INFO):
+
+      WARNING  ปลายทางมีแถว/ distinct key **น้อยกว่า** batch นี้        → เขียนหาย
+      WARNING  ปลายทางมี rows > distinct key ในปีนั้น (นับจากปลายทางเอง) → มีแถวซ้ำ key จริง
+               ไม่ว่าจะเกิดจาก append รันซ้ำหรือชุดข้อมูลทับกัน — ไม่ใช้ threshold เพราะซ้ำ 1 แถวก็คือซ้ำ
+      INFO     ปลายทางมีแถวมากกว่า batch นี้แต่ไม่มีซ้ำ                → ข้อมูลสะสมจาก upload ก่อนหน้า (ปกติ)
     """
     result = ReconcileResult(label=f"{expected.label} → {actual.label}")
     for y in expected.years:
         e, a = expected.per_year[y], actual.per_year.get(y, 0)
-        if a < e:
-            result.issues.append(f"ปี {y}: ปลายทางมี {a} แถว น้อยกว่าที่เขียน {e} (หาย {e - a})")
-        elif a > e:
-            result.issues.append(
-                f"ปี {y}: ปลายทางมี {a} แถว มากกว่าที่เขียน {e} (เกิน {a - e} — เป็นไปได้ว่า append รันซ้ำ/แถวซ้ำ)"
-            )
         ed, ad = expected.distinct_per_year.get(y, 0), actual.distinct_per_year.get(y, 0)
-        if ed != ad:
-            result.issues.append(f"ปี {y}: distinct key ปลายทาง {ad} ≠ ที่เขียน {ed}")
+        if a < e:
+            result.issues.append(f"ปี {y}: ปลายทางมี {a} แถว น้อยกว่า batch ที่เขียน {e} (หาย {e - a})")
+        if ad < ed:
+            result.issues.append(f"ปี {y}: distinct key ปลายทาง {ad} น้อยกว่า batch ที่เขียน {ed}")
+        if a > ad:
+            result.issues.append(
+                f"ปี {y}: ปลายทางมี {a} แถว แต่ distinct key {ad} → ซ้ำ {a - ad} แถว "
+                "(append รันซ้ำ หรือชุดข้อมูลทับกัน)"
+            )
+        elif a > e:
+            logger.info(
+                "reconcile ปี %d: %s มี %d แถว มากกว่า batch นี้ %d — สะสมจาก upload ก่อนหน้า ไม่มีแถวซ้ำ",
+                y, actual.label, a, e,
+            )
     _log(result, expected, actual)
     return result
 
