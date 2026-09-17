@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 
 from helpers.connect_db import connect_to_db, close_connection
-from src.finance.loader import ensure_replace_allowed
+from helpers.replace_guard import ensure_replace_allowed
 
 load_dotenv(override=True)
 
@@ -73,7 +73,7 @@ class MasterLoader:
         if mode not in ("append", "replace"):
             raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace'")
         if mode == "replace":
-            ensure_replace_allowed(f'"{SCHEMA}"."{table_name}"')
+            ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{table_name}"')
 
         cols = [c for c in _TABLE_COLUMNS[table_name] if c in df.columns]
         if self.created_by is not None:

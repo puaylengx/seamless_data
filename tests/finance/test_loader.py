@@ -1,4 +1,6 @@
-"""ทดสอบ ALLOW_REPLACE guard ของ ErpLoader / MasterLoader (G2) — ไม่ต่อ DB จริง"""
+"""ทดสอบว่า ErpLoader / MasterLoader เรียก guard กลาง (helpers.replace_guard) ถูกจุด (G2) — ไม่ต่อ DB จริง
+
+พฤติกรรมของ guard เอง (ค่าไหนผ่าน/ไม่ผ่าน) ทดสอบที่ tests/helpers/test_replace_guard.py"""
 import sys
 from pathlib import Path
 
@@ -9,7 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import src.finance.loader as erp_loader_mod
 import src.finance.master.loader as master_loader_mod
-from src.finance.loader import ErpLoader, ensure_replace_allowed, replace_allowed
+from src.finance.loader import ErpLoader
 from src.finance.master.loader import MasterLoader
 
 
@@ -35,34 +37,6 @@ def _erp_df() -> pd.DataFrame:
 
 def _master_df() -> pd.DataFrame:
     return pd.DataFrame({"fund_id": ["F1"], "fund_description": ["x"], "status": ["active"]})
-
-
-# ── replace_allowed / ensure_replace_allowed ──────────────────────────────────
-
-def test_replace_allowed_default_false(replace_blocked):
-    assert replace_allowed() is False
-    print("✅ ไม่ตั้ง ALLOW_REPLACE → false")
-
-
-@pytest.mark.parametrize("value", ["false", "False", "0", "yes", "", "  "])
-def test_replace_allowed_rejects_non_true(monkeypatch, value):
-    monkeypatch.setenv("ALLOW_REPLACE", value)
-    assert replace_allowed() is False
-
-
-@pytest.mark.parametrize("value", ["true", "TRUE", " True "])
-def test_replace_allowed_accepts_true_case_insensitive(monkeypatch, value):
-    monkeypatch.setenv("ALLOW_REPLACE", value)
-    assert replace_allowed() is True
-
-
-def test_ensure_replace_allowed_raises_with_target_in_message(replace_blocked):
-    with pytest.raises(RuntimeError) as exc:
-        ensure_replace_allowed('"public"."erp_2025"')
-    msg = str(exc.value)
-    assert '"public"."erp_2025"' in msg
-    assert "ALLOW_REPLACE" in msg
-    print("✅ RuntimeError บอกตารางและวิธีแก้")
 
 
 # ── ErpLoader ─────────────────────────────────────────────────────────────────
