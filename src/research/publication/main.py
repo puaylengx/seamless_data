@@ -28,7 +28,18 @@ from src.research.publication.transformer import (
     get_extract_sdg_values,
 )
 from src.research.publication.validator import validate_publication
-from src.research.publication.loader import load_to_mssql, load_to_bigquery, export_to_excel, _RENAME_MAP
+from src.research.publication.loader import (
+    MERGE_KEYS,
+    YEAR_COL,
+    _RENAME_MAP,
+    _prepare_df,
+    bq_summary,
+    export_to_excel,
+    load_to_bigquery,
+    load_to_mssql,
+    mssql_summary,
+)
+from src.research.reconcile import compare, compare_destinations, summarize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR      = PROJECT_ROOT / "logs" / "research" / "publication" / "check_value"
@@ -140,6 +151,35 @@ def run_template(input_path: str) -> Path:
     return output_path
 
 
+def reconcile(df: pd.DataFrame, *, mssql: bool, bq: bool) -> bool:
+    """
+    G4 — หลัง upload เทียบสิ่งที่เตรียมเขียน (prepared df) กับปลายทางที่เปิดใช้ทีละปี
+    และถ้าเขียนทั้ง MSSQL + BigQuery เทียบสอง DB ต่อกันด้วย
+    คืน True เมื่อตรงกันหมด — ไม่ raise เพราะ source of truth ยังรอ PD-4 (log WARNING ให้คนตัดสิน)
+    """
+    expected = summarize(_prepare_df(df), YEAR_COL, MERGE_KEYS, label="prepared")
+    years = expected.years
+    logger.info("--- Reconcile (%d ปี: %s) ---", len(years), years)
+
+    ok = True
+    summaries = []
+    for enabled, name, fetch in ((mssql, "MSSQL", mssql_summary), (bq, "BigQuery", bq_summary)):
+        if not enabled:
+            continue
+        try:
+            actual = fetch(years)
+        except Exception:
+            logger.exception("reconcile: อ่านสรุปจาก %s ไม่สำเร็จ — ข้าม (ข้อมูลถูกเขียนไปแล้ว ต้องตรวจเอง)", name)
+            ok = False
+            continue
+        ok = compare(expected, actual).ok and ok
+        summaries.append(actual)
+
+    if len(summaries) == 2:
+        ok = compare_destinations(summaries[0], summaries[1]).ok and ok
+    return ok
+
+
 def run_upload(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → MSSQL " + "=" * 20)
     logger.info("Input: %s", input_path)
@@ -150,6 +190,7 @@ def run_upload(input_path: str) -> None:
         sys.exit(1)
     logger.info("✅ Validation passed")
     load_to_mssql(df)
+    reconcile(df, mssql=True, bq=False)
     logger.info("🏁 Upload MSSQL complete")
 
 
@@ -163,6 +204,7 @@ def run_upload_bq(input_path: str) -> None:
         sys.exit(1)
     logger.info("✅ Validation passed")
     load_to_bigquery(df)
+    reconcile(df, mssql=False, bq=True)
     logger.info("🏁 Upload BigQuery complete")
 
 
@@ -225,6 +267,10 @@ def run_pipeline(input_path: str) -> None:
         load_to_bigquery(df)
     else:
         logger.info("⏭️  BigQuery upload skipped (PUBLICATION_UPLOAD_BQ=false)")
+
+    # 4. Reconcile ปลายทางที่เขียนจริง (G4)
+    if upload_mssql or upload_bq:
+        reconcile(df, mssql=upload_mssql, bq=upload_bq)
 
     logger.info("🏁 Pipeline complete")
 

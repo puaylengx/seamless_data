@@ -19,7 +19,17 @@ sys.path.append(str(Path(__file__).resolve().parents[3]))
 from helpers.logger import get_styled_logger
 from src.research.track_evaluation.transformer import UPLOAD_COLUMNS, build_track_template, coerce_and_clean
 from src.research.track_evaluation.validator import validate_track_evaluation
-from src.research.track_evaluation.loader import load_to_mssql, load_to_bigquery, export_to_excel
+from src.research.track_evaluation.loader import (
+    MERGE_KEYS,
+    YEAR_COL,
+    bq_summary,
+    export_to_excel,
+    load_to_bigquery,
+    load_to_mssql,
+    mssql_summary,
+    prepare_for_load,
+)
+from src.research.reconcile import compare, compare_destinations, summarize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR      = PROJECT_ROOT / "logs" / "research" / "track_evaluation"
@@ -74,11 +84,40 @@ def _load_reviewed_template(input_path: str) -> pd.DataFrame:
     return df
 
 
+def reconcile(df: pd.DataFrame, *, mssql: bool, bq: bool) -> bool:
+    """
+    G4 — หลัง upload เทียบ prepared df กับปลายทางที่เปิดใช้ทีละปี และเทียบ MSSQL ⇄ BigQuery เมื่อเขียนทั้งคู่
+    คืน True เมื่อตรงกันหมด — ไม่ raise (source of truth รอ PD-4) แค่ log WARNING ให้คนตัดสิน
+    """
+    expected = summarize(prepare_for_load(df), YEAR_COL, MERGE_KEYS, label="prepared")
+    years = expected.years
+    logger.info("--- Reconcile (%d ปี: %s) ---", len(years), years)
+
+    ok = True
+    summaries = []
+    for enabled, name, fetch in ((mssql, "MSSQL", mssql_summary), (bq, "BigQuery", bq_summary)):
+        if not enabled:
+            continue
+        try:
+            actual = fetch(years)
+        except Exception:
+            logger.exception("reconcile: อ่านสรุปจาก %s ไม่สำเร็จ — ข้าม (ข้อมูลถูกเขียนไปแล้ว ต้องตรวจเอง)", name)
+            ok = False
+            continue
+        ok = compare(expected, actual).ok and ok
+        summaries.append(actual)
+
+    if len(summaries) == 2:
+        ok = compare_destinations(summaries[0], summaries[1]).ok and ok
+    return ok
+
+
 def run_upload(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → MSSQL " + "=" * 20)
     logger.info("Input: %s", input_path)
     df = _load_reviewed_template(input_path)
     load_to_mssql(df)
+    reconcile(df, mssql=True, bq=False)
     logger.info("🏁 Upload MSSQL complete")
 
 
@@ -104,6 +143,7 @@ def run_upload_bq(input_path: str) -> None:
     logger.info("Input: %s", input_path)
     df = _load_reviewed_template(input_path)
     load_to_bigquery(df)
+    reconcile(df, mssql=False, bq=True)
     logger.info("🏁 Upload BigQuery complete")
 
 
@@ -128,12 +168,19 @@ def run_pipeline(input_path: str) -> None:
         logger.info("🏁 Pipeline complete")
         return
 
+    # อ่าน + validate ครั้งเดียว แล้วเขียนทั้งสองปลายทางจาก DataFrame ชุดเดียวกัน
+    df = _load_reviewed_template(input_path)
+
     if upload_mssql:
-        run_upload(input_path)
+        logger.info("--- Upload → MSSQL ---")
+        load_to_mssql(df)
 
     if upload_bq:
-        run_upload_bq(input_path)
+        logger.info("--- Upload → BigQuery ---")
+        load_to_bigquery(df)
 
+    # Reconcile ปลายทางที่เขียนจริง + MSSQL ⇄ BigQuery ถ้าเขียนทั้งคู่ (G4)
+    reconcile(df, mssql=upload_mssql, bq=upload_bq)
 
     logger.info("🏁 Pipeline complete")
 

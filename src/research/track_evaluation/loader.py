@@ -5,15 +5,21 @@ from urllib.parse import quote
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import DECIMAL, NVARCHAR, Integer, Date
+
+from src.research.reconcile import Summary, fetch_summary_sql
 
 load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
 _EXCEL_ROW_OFFSET = 2
+
+# key ที่ระบุ "รายการประเมินเดียวกัน" — ใช้ทั้ง BigQuery MERGE และ reconciliation distinct count
+MERGE_KEYS = ["product_code", "publication_year", "order_num", "firstname", "lastname", "title"]
+YEAR_COL = "publication_year"
 
 _DTYPE_MAP = {
     "weight": DECIMAL(10, 2),
@@ -68,29 +74,71 @@ def check_string_lengths(df: pd.DataFrame, engine, schema: str, table: str) -> l
     return errors
 
 
-def load_to_mssql(df: pd.DataFrame) -> None:
+_INT_COLS = ["order_num", "publication_year", "reward"]
+_FLOAT_COLS = ["weight", "quality", "contribution", "score"]
+
+
+def prepare_for_load(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    เตรียม DataFrame (หลัง coerce_and_clean + validate) ให้พร้อมเขียน — **ตัวเดียวสำหรับทั้ง MSSQL และ BigQuery** (G4)
+
+    เดิม MSSQL ทำ strip/blank→None inline ส่วน BigQuery มี prep แยกของตัวเอง (ไม่ strip) → สอง DB ได้ค่าต่างกัน
+      - text: strip whitespace, ค่าว่าง → None
+      - int:  order_num / publication_year / reward → Int64 (nullable)
+      - float: weight / quality / contribution / score
+      - publication_date → date object
+    คืน DataFrame ใหม่ ไม่แก้ตัวที่รับเข้ามา; ทุก null เป็น None (ไม่ใช่ NaN/NA) ให้ driver ทั้งสองรับได้เหมือนกัน
+    """
+    df = df.copy()
     for col in _TEXT_COLS:
         if col in df.columns:
-            df[col] = df[col].fillna("").astype(str).str.strip()
+            df[col] = df[col].astype(object).map(
+                lambda x: None if pd.isna(x) or str(x).strip() == "" else str(x).strip()
+            )
+    for col in _INT_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+    for col in _FLOAT_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    if "publication_date" in df.columns:
+        df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
+    return df.astype(object).where(pd.notnull(df), None)
 
+
+def _mssql_engine():
     conn_str = (
         f"mssql+pyodbc://{os.getenv('LOCAL_USERNAME')}:{quote(os.getenv('LOCAL_PASSWORD'))}@"
         f"{os.getenv('LOCAL_HOST')}/{os.getenv('RESEARCH_DATABASE')}?"
         "driver=ODBC+Driver+17+for+SQL+Server"
     )
-    engine = create_engine(conn_str, fast_executemany=True)
+    return create_engine(conn_str, fast_executemany=True)
+
+
+def _mssql_target() -> tuple[str, str]:
+    return os.getenv("SCHEMA_DEFAULT"), os.getenv("TRACK_EVALUATION")
+
+
+def _bq_tables() -> tuple[str, str]:
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset_id = os.getenv("GCP_DATASET_ID")
+    staging = f"{project_id}.{dataset_id}.{os.getenv('GCP_TRACK_EVAL_STAGING_TABLE', 'track_evaluation_staging')}"
+    prod = f"{project_id}.{dataset_id}.{os.getenv('GCP_TRACK_EVAL_TABLE_NAME', 'track_evaluation')}"
+    return staging, prod
+
+
+def load_to_mssql(df: pd.DataFrame) -> None:
+    df = prepare_for_load(df)
+    engine = _mssql_engine()
     logger.info("เชื่อมต่อฐานข้อมูลสำเร็จ")
 
-    schema = os.getenv("SCHEMA_DEFAULT")
-    table = os.getenv("TRACK_EVALUATION")
+    schema, table = _mssql_target()
 
     errors = check_string_lengths(df, engine, schema=schema, table=table)
     if errors:
         for col, max_len, rows in errors:
             logger.error("- %s เกิน %d ตัวอักษร ที่ Excel rows: %s", col, max_len, rows)
         raise ValueError("พบข้อความยาวเกินกำหนด ยกเลิกการเขียนข้อมูลลงฐานข้อมูล")
-
-    df = df.map(lambda x: None if (pd.isna(x) or (isinstance(x, str) and x.strip() == "")) else x)
 
     try:
         df.to_sql(
@@ -108,36 +156,6 @@ def load_to_mssql(df: pd.DataFrame) -> None:
         raise
 
 
-# merge keys สำหรับ UPSERT ไปยัง BigQuery
-_BQ_MERGE_KEYS = [
-    "product_code", "publication_year", "order_num", "firstname", "lastname", "title",
-]
-
-_BQ_STR_COLS = [
-    "product_code", "rc_meeting", "publication_month", "firstname", "lastname",
-    "rank", "division", "description", "corresponding", "title", "source",
-]
-
-_BQ_INT_COLS = ["order_num", "publication_year", "reward"]
-_BQ_FLOAT_COLS = ["weight", "quality", "contribution", "score"]
-
-
-def _prepare_bq_df(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    for col in _BQ_STR_COLS:
-        if col in df.columns:
-            df[col] = df[col].astype("string")
-    for col in _BQ_INT_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-    for col in _BQ_FLOAT_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-    if "publication_date" in df.columns:
-        df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
-    return df.where(pd.notnull(df), None)
-
-
 def load_to_bigquery(df: pd.DataFrame) -> None:
     from google.cloud import bigquery
 
@@ -147,17 +165,9 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
 
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset_id = os.getenv("GCP_DATASET_ID")
-    staging_table = (
-        f"{project_id}.{dataset_id}."
-        f"{os.getenv('GCP_TRACK_EVAL_STAGING_TABLE', 'track_evaluation_staging')}"
-    )
-    prod_table = (
-        f"{project_id}.{dataset_id}."
-        f"{os.getenv('GCP_TRACK_EVAL_TABLE_NAME', 'track_evaluation')}"
-    )
+    staging_table, prod_table = _bq_tables()
 
-    df = _prepare_bq_df(df)
+    df = prepare_for_load(df)
     bq = bigquery.Client(project=project_id)
     logger.info("✅ BigQuery client initialized for project %s", project_id)
 
@@ -174,9 +184,9 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     load_job.result()
     logger.info("✅ Loaded %d rows into %s", load_job.output_rows, staging_table)
 
-    update_columns = [c for c in prod_columns if c not in _BQ_MERGE_KEYS]
+    update_columns = [c for c in prod_columns if c not in MERGE_KEYS]
     update_set = ",\n    ".join(f"{c} = S.{c}" for c in update_columns)
-    on_clause = "\n       AND ".join(f"T.{k} = S.{k}" for k in _BQ_MERGE_KEYS)
+    on_clause = "\n       AND ".join(f"T.{k} = S.{k}" for k in MERGE_KEYS)
     merge_sql = f"""
     MERGE `{prod_table}` T
     USING `{staging_table}` S
@@ -191,6 +201,33 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     merge_job = bq.query(merge_sql)
     merge_job.result()
     logger.info("✅ Merge to %s completed", prod_table)
+
+
+# ── reconciliation (G4) ───────────────────────────────────────────────────────
+
+def mssql_summary(years: list[int], engine=None) -> Summary:
+    """สรุปแถว/ปี ใน MSSQL จริงสำหรับปีที่เพิ่ง upload — engine ส่งมาได้เพื่อ test"""
+    engine = engine or _mssql_engine()
+    schema, table = _mssql_target()
+    with engine.connect() as conn:
+        return fetch_summary_sql(
+            execute=lambda sql: conn.execute(text(sql)).fetchall(),
+            table_fqn=f"[{schema}].[{table}]",
+            year_col=YEAR_COL, key_cols=MERGE_KEYS, years=years, label="MSSQL",
+        )
+
+
+def bq_summary(years: list[int], client=None) -> Summary:
+    """สรุปแถว/ปี ใน BigQuery prod table จริง — client ส่งมาได้เพื่อ test"""
+    if client is None:
+        from google.cloud import bigquery
+        client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
+    _, prod_table = _bq_tables()
+    return fetch_summary_sql(
+        execute=lambda sql: [tuple(r.values()) for r in client.query(sql).result()],
+        table_fqn=f"`{prod_table}`",
+        year_col=YEAR_COL, key_cols=MERGE_KEYS, years=years, label="BigQuery",
+    )
 
 
 def export_to_excel(df: pd.DataFrame, output_path: Path) -> Path:
