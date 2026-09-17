@@ -12,6 +12,7 @@
 | PD-4 | source of truth: MSSQL vs BigQuery (G4) | Business owner ฝ่ายวิจัย | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-5 | grant จริงของ DB user ที่ pipeline ใช้ (G7) | DBA | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-6 | dashboard tool + เจ้าของ access policy (G8, G12) | หัวหน้าทีม / ผู้ใช้ dashboard | ⏳ รอคำตอบ | 2026-09-17 |
+| PD-7 | ลบ backup tags `backup/pre-rewrite/*` (17 tags, local เท่านั้น) | Project owner สั่งเอง | ⏳ **ครบกำหนด 2026-09-24** — ห้ามลบอัตโนมัติ | 2026-09-17 |
 
 ---
 
@@ -56,6 +57,14 @@
 - **ถามอะไร:** จะใช้เครื่องมืออะไร (Looker Studio / Power BI / Metabase / อื่น) และใครเป็นคนอนุมัติว่า role ไหนเห็นชื่อนักวิจัย + reward รายบุคคลได้
 - **ทำไมต้องถาม:** RBAC / authorized view / refresh schedule / Metric Dictionary ออกแบบไม่ได้ถ้าไม่รู้เครื่องมือและเจ้าของ policy
 
+## PD-7 · ลบ backup tags หลัง history rewrite — ครบกำหนด **2026-09-24**
+
+- **ถามใคร:** Project owner (ไม่ใช่นอกทีม แต่ต้องสั่งเอง ห้าม Claude ลบอัตโนมัติ)
+- **ถามอะไร:** หลัง 2026-09-24 (7 วันนับจาก rewrite) ถ้าไม่พบปัญหาแทรกซ้อนจากการ rewrite history วันที่ 2026-09-17 (16 commits remapped, ลบ trailer `Co-Authored-By: Claude`) ให้ลบ tag `backup/pre-rewrite/*` ทั้ง 17 ตัวด้วย `git tag -d $(git tag -l 'backup/pre-rewrite/*')`
+- **ทำไมต้องรอ:** tag เหล่านี้ยังชี้ commit เดิม (SHA เก่า) ไว้ใช้ย้อนกลับได้ถ้า PR #2/#3/#4 หรือ main มีปัญหา; ผลข้างเคียงคือ `git log --all --grep="Co-Authored-By: Claude"` ยังเห็น 11 commit เดิมผ่าน tag เหล่านี้จนกว่าจะลบ (ใช้ `--branches --remotes` แทนจะได้ 0)
+- **สำรองอื่นที่ไม่ได้อยู่ใน repo:** `~/Desktop/icit_project/icit_data/seamless_data-before-rewrite-2026-09-17.bundle` — ลบหรือเก็บต่อได้ตามสะดวก ไม่กระทบ repo
+- **ผลเมื่อลบแล้ว:** ย้ายรายการนี้ไปตาราง "ตัดสินภายในทีมแล้ว" พร้อมวันที่
+
 ---
 
 ## ตัดสินภายในทีมแล้ว (ไม่ต้องรอนอกทีม) — เก็บไว้เป็น audit trail จนกว่าจะมี `docs/decisions/`
@@ -65,4 +74,5 @@
 | 2026-09-17 | non-numeric `score`/`weight` ใน track_evaluation → NULL + WARNING หรือ fail? | คงเป็น WARNING (behavior เดิมของ path MSSQL) ผูกกับ PD-2 | G3, PR #1 |
 | 2026-09-17 | `MasterLoader` default `mode="replace"` ต้อง opt-in `ALLOW_REPLACE` ด้วยหรือไม่ | ต้อง — `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag (README) | G2, PR #1 |
 | 2026-09-17 | guard `ALLOW_REPLACE` copy ต่อ module หรือรวม? | รวมเป็น `helpers/replace_guard.py` ตัวเดียว ทุก loader import ร่วม | G2, PR #1/#2 |
+| 2026-09-17 | trailer `Co-Authored-By: Claude` ใน 11 commit ที่ push แล้ว | rewrite ทั้งหมดครั้งเดียวด้วย filter-repo (16 SHA เปลี่ยน, tree เท่าเดิม) + force-with-lease; กฎถาวรอยู่ใน CLAUDE.md | PR #3, PR #4 |
 | 2026-09-17 | zeal_data half ของ G2 อยู่ branch ไหน | `fix/phase0-zeal-replace-guard` base `feat/aditayathorn-zeal-data` (module ยังไม่อยู่บน main) | PR #2 |
