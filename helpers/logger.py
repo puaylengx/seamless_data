@@ -7,6 +7,9 @@ from typing import Optional
 import colorlog
 
 
+# logger ราก ("src") ที่ทุก submodule ใน src/ ใช้ผ่าน logging.getLogger(__name__)
+SRC_LOGGER_NAME = "src"
+
 # ── Custom SUCCESS level ──────────────────────────────────────────────────────
 _SUCCESS = 25
 logging.addLevelName(_SUCCESS, "SUCCESS")
@@ -75,15 +78,16 @@ def get_styled_logger(
     """
     Logger พร้อมสีใน terminal (ใช้ colorlog) + บันทึกไฟล์แบบปกติ
     รองรับ level SUCCESS (25) เพิ่มเติม
+
+    handler ชุดเดียวกันจะถูกผูกไว้ 2 จุด:
+      - logger ชื่อ `name` (ปกติคือ "__main__" ของ pipeline ที่รัน)
+      - logger ชื่อ SRC_LOGGER_NAME ("src") — เพื่อให้ submodule ที่ใช้
+        logging.getLogger(__name__) เช่น "src.research.publication.validator"
+        เขียนลงไฟล์/terminal เดียวกัน (ก่อนหน้านี้ log พวกนี้หายเงียบๆ
+        เพราะ "src.*" ไม่ใช่ลูกของ "__main__" ใน logging hierarchy)
     """
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
-
-    logger = logging.getLogger(name)
-    logger.setLevel(log_level)
-
-    if logger.hasHandlers():
-        logger.handlers.clear()
 
     color_formatter = colorlog.ColoredFormatter(
         "%(log_color)s%(asctime)s - %(name)s - %(levelname)-8s - %(message)s",
@@ -105,11 +109,32 @@ def get_styled_logger(
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(color_formatter)
-    logger.addHandler(stream_handler)
 
     file_handler = logging.FileHandler(log_path / log_filename, encoding="utf-8")
     file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
 
-    logger.propagate = False
+    logger = logging.getLogger(name)
+    targets = [logger]
+    if name != SRC_LOGGER_NAME:
+        targets.append(logging.getLogger(SRC_LOGGER_NAME))
+
+    # ถูกเรียกซ้ำ (เช่นใน test หรือรัน pipeline หลายตัวใน process เดียว)
+    # → handler ชุดล่าสุดแทนชุดเดิมทั้งสอง logger ไม่เขียนซ้ำ
+    for target in targets:
+        target.setLevel(log_level)
+        _close_handlers(target)
+        target.addHandler(stream_handler)
+        target.addHandler(file_handler)
+        target.propagate = False
+
     return logger
+
+
+def _close_handlers(logger: logging.Logger) -> None:
+    """ถอด handler เดิมออกและปิด file ที่เปิดอยู่ กันการเขียนซ้ำเมื่อถูกเรียกหลายรอบ"""
+    for h in list(logger.handlers):
+        logger.removeHandler(h)
+        try:
+            h.close()
+        except Exception:
+            pass
