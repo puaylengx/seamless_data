@@ -9,11 +9,11 @@
 | Phase | เสร็จ | กำลังทำ | ยังไม่เริ่ม | blocked บางส่วน |
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
-| Phase 1 | 0/5 | — | 5 | G4 (PD-4), G7 (PD-5) |
+| Phase 1 | 0/5 | G1 (PR #6) | 4 | G4 (PD-4), G7 (PD-5) |
 | Phase 2 | 0/7 | — | 7 | G5 (PD-3), G10 (Finance), G13 (Finance master file) |
-| Phase 3 | 0/6 | — | 6 | G8 (PD-6), G12 (PD-6) |
+| Phase 3 | 0/6 | G20 (PR #6) | 5 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-17_
+_อัปเดตล่าสุด: 2026-09-17 (G1/G20 → PR #6)_
 
 ---
 
@@ -26,7 +26,7 @@ _อัปเดตล่าสุด: 2026-09-17_
 
 ## Phase 1 — ปิด critical/high ด้าน quality + security (Sprint 1–2)
 
-- [ ] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] ✋ `requirements-dev.txt` + `pyproject.toml` + GitHub Actions (ruff + pytest ทุก PR); test ให้ publication + zeal_data (track_evaluation มีแล้วจาก G3)
+- [~] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) รอ review — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
 - [ ] **G4** 🟠 · Data layering · [Pipeline] ✋ shared prepare สำหรับ MSSQL/BQ + reconciliation step (row count / per-year) · 🔒 ประกาศ source of truth รอ PD-4
 - [ ] **G7** 🟠 · Security (Least Privilege) · [Security] ✋ `TRUNCATE` → `DELETE FROM`, เขียน `docs/db-roles.md` (`etl_writer` / `schema_owner`) · 🔒 ตรวจ grant จริงรอ PD-5 (DBA)
 - [ ] **G16** 🟡 · Security · [Security] ✋ pre-commit + gitleaks, ย้าย SA JSON ออกนอก repo tree, `sqlalchemy.URL.create()` แทน f-string password
@@ -49,7 +49,7 @@ _อัปเดตล่าสุด: 2026-09-17_
 - [ ] **G17** 🟡 · Config management · [Pipeline] ✋ ลบ hardcoded infra fallback (`SSH_HOST`, `DB_NAME`), รวม connection เป็น `helpers/connect_db/{postgres,mssql,bigquery}.py`
 - [ ] **G18** 🟢 · Documentation · [PM + ทุกคน] ✋ README module map, `docs/decisions/` decision log (ย้ายตาราง "ตัดสินภายในทีมแล้ว" จาก pending-decisions มา), แทน `print()` ที่เหลือ ~30 จุด (ค้างจาก G9)
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
-- [ ] **G20** 🟢 · Testing · [DevOps] ✋ `@pytest.mark.integration` ให้ `tests/test_connection.py` + skip ใน CI (ทำพร้อม G1 ได้)
+- [~] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`
 
 ---
 
@@ -57,6 +57,7 @@ _อัปเดตล่าสุด: 2026-09-17_
 
 - [~] `feat/finance-fill-cost-owner` `3b923e0` — 🔒 PD-1 (Finance) ยังไม่ push/ไม่ merge
 - [~] `fix/odbc-driver-18` `f023f81` — รอ DevOps review (Driver 18 `Encrypt=yes`) ยังไม่ push
-- [~] [PR #3](https://github.com/puaylengx/seamless_data/pull/3) docs Phase 0 status + SHA ใหม่ + PD-7 — รอ review
-- [~] [PR #4](https://github.com/puaylengx/seamless_data/pull/4) CLAUDE.md + กฎ commit message — รอ review
+- [x] [PR #3](https://github.com/puaylengx/seamless_data/pull/3) docs Phase 0 status + SHA ใหม่ + PD-7 — merged `36c5c93`
+- [x] [PR #4](https://github.com/puaylengx/seamless_data/pull/4) CLAUDE.md + กฎ commit message — merged `8590a64`
+- [x] [PR #5](https://github.com/puaylengx/seamless_data/pull/5) gap tracker (ไฟล์นี้) — merged `3cbe7cc`
 - [ ] PD-7 ลบ `backup/pre-rewrite/*` tags — หลัง 2026-09-24 รอ owner สั่ง
