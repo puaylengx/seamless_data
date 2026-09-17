@@ -1,4 +1,6 @@
-"""ทดสอบ ALLOW_REPLACE guard และ default insert mode ของ zeal_data loader (G2) — ไม่ต่อ DB จริง"""
+"""ทดสอบว่า zeal_data loader เรียก guard กลาง (helpers.replace_guard) ถูกจุด + default insert mode (G2) — ไม่ต่อ DB จริง
+
+พฤติกรรมของ guard เอง ทดสอบที่ tests/helpers/test_replace_guard.py"""
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,11 +11,7 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 import src.aditayathorn.zeal_data.ingest.loader as loader_mod
-from src.aditayathorn.zeal_data.ingest.loader import (
-    ensure_replace_allowed,
-    load_all,
-    replace_allowed,
-)
+from src.aditayathorn.zeal_data.ingest.loader import load_all
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -54,31 +52,6 @@ def captured_to_sql(monkeypatch):
 
 def _tables() -> dict[str, pd.DataFrame]:
     return {"Customer": pd.DataFrame({"id": [1]})}
-
-
-# ── replace_allowed ───────────────────────────────────────────────────────────
-
-def test_replace_allowed_default_false(base_env):
-    assert replace_allowed() is False
-
-
-@pytest.mark.parametrize("value", ["false", "0", "yes", ""])
-def test_replace_allowed_rejects_non_true(monkeypatch, value):
-    monkeypatch.setenv("ALLOW_REPLACE", value)
-    assert replace_allowed() is False
-
-
-@pytest.mark.parametrize("value", ["true", "TRUE", " True "])
-def test_replace_allowed_accepts_true(monkeypatch, value):
-    monkeypatch.setenv("ALLOW_REPLACE", value)
-    assert replace_allowed() is True
-
-
-def test_ensure_replace_allowed_message(base_env):
-    with pytest.raises(RuntimeError) as exc:
-        ensure_replace_allowed("zeal_test.public.*")
-    assert "zeal_test.public.*" in str(exc.value)
-    assert "ALLOW_REPLACE" in str(exc.value)
 
 
 # ── load_all ──────────────────────────────────────────────────────────────────
