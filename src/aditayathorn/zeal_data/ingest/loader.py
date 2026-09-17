@@ -23,6 +23,26 @@ def _int(key: str, default: int) -> int:
     return int(v) if v and v.strip() else default
 
 
+def replace_allowed() -> bool:
+    """insert mode "replace" (DROP + CREATE ตารางปลายทาง) ต้อง opt-in ผ่าน ALLOW_REPLACE=true"""
+    return _str("ALLOW_REPLACE", "false").lower() == "true"
+
+
+def ensure_replace_allowed(target: str) -> None:
+    """
+    Guard ก่อนทำ destructive replace — raise RuntimeError ถ้ายังไม่ได้ opt-in
+    เรียกก่อนเปิด connection เสมอ เพื่อไม่แตะ DB เลยเมื่อไม่ผ่าน
+    (guard ชุดเดียวกับ src/finance/loader.py — ใช้ env var ตัวเดียวกัน)
+    """
+    if not replace_allowed():
+        raise RuntimeError(
+            f"ZEAL_INSERT_MODE='replace' จะ DROP แล้วสร้าง {target} ใหม่ทุกตาราง "
+            "— ถูกบล็อกไว้เพราะ ALLOW_REPLACE ไม่ได้ตั้งเป็น true ใน .env\n"
+            "ถ้าตั้งใจล้างข้อมูลจริง ให้ตั้ง ALLOW_REPLACE=true ชั่วคราว "
+            "แล้วรีเซ็ตกลับเป็น false ทันทีหลังรันเสร็จ (pre-deployment checklist)"
+        )
+
+
 def _sanitize_name(name: str) -> str:
     """แปลงชื่อตารางให้เป็น snake_case ที่ PostgreSQL รองรับ"""
     sanitized = re.sub(r"[^a-z0-9_]", "_", name.lower()).strip("_")
@@ -79,17 +99,20 @@ def _engine_session(db_name: str):
 def load_all(tables: dict[str, pd.DataFrame], db_name: str | None = None) -> None:
     """
     Insert ทุกตารางใน dict เข้า PostgreSQL
-    ใช้ env vars: ZEAL_DB_NAME, ZEAL_SCHEMA, ZEAL_INSERT_MODE
+    ใช้ env vars: ZEAL_DB_NAME, ZEAL_SCHEMA, ZEAL_INSERT_MODE (default: append)
+    insert mode "replace" ต้องตั้ง ALLOW_REPLACE=true ด้วย ไม่งั้น RuntimeError ก่อนแตะ DB
     """
     db_name = db_name or _str("ZEAL_DB_NAME")
     if not db_name:
         raise ValueError("ระบุ ZEAL_DB_NAME ใน .env หรือส่ง db_name argument")
 
     schema = _str("ZEAL_SCHEMA", "public") or "public"
-    insert_mode = _str("ZEAL_INSERT_MODE", "replace") or "replace"
+    insert_mode = _str("ZEAL_INSERT_MODE", "append") or "append"
 
     if insert_mode not in ("replace", "append"):
         raise ValueError(f"ZEAL_INSERT_MODE ต้องเป็น 'replace' หรือ 'append' ได้รับ: '{insert_mode}'")
+    if insert_mode == "replace":
+        ensure_replace_allowed(f"{db_name}.{schema}.*")
 
     with _engine_session(db_name) as engine:
         for original_name, df in tables.items():
