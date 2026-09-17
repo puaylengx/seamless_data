@@ -19,7 +19,7 @@
 
 - **ถามใคร:** Domain Expert — Finance
 - **ถามอะไร:** เมื่อแถวใน ERP Excel มี `Cost_Owner` ว่าง ควรเติมด้วยค่า `CostCtr_ID` ของแถวนั้นหรือไม่ หรือควรปล่อยว่าง / reject
-- **ทำไมต้องถาม:** โค้ดนี้อยู่บน branch `feat/finance-fill-cost-owner` (commit `1abe498`) **ยังไม่มี test และไม่มีบันทึกว่าฝ่ายการเงินขอ** — ถ้าเติมผิด dashboard จะรวมยอดเข้า owner ที่ไม่ใช่เจ้าของงบจริง
+- **ทำไมต้องถาม:** โค้ดนี้อยู่บน branch `feat/finance-fill-cost-owner` (commit `3b923e0`) **ยังไม่มี test และไม่มีบันทึกว่าฝ่ายการเงินขอ** — ถ้าเติมผิด dashboard จะรวมยอดเข้า owner ที่ไม่ใช่เจ้าของงบจริง
 - **ผลถ้าตอบ "ใช่":** เขียน `test_fill_cost_owner` + decision log แล้ว PR เข้า main
 - **ผลถ้าตอบ "ไม่":** ลบ branch ทิ้ง
 

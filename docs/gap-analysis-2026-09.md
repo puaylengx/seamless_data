@@ -4,7 +4,7 @@
 > ตรวจสอบจากโค้ดจริงทั้ง repo (helpers, migrations, src ทั้ง 4 module, tests, docs,
 > .env/.env.example, git history/branches, logs จริง) เรียงตามความสำคัญ ไม่เรียงตามหมวด
 >
-> **สถานะ Phase 0 (2026-09-17):** ✅ **เสร็จ** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged เข้า main (`75a3c57`);
+> **สถานะ Phase 0 (2026-09-17):** ✅ **เสร็จ** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged เข้า main (`1d31962`);
 > ส่วน zeal_data ของ G2 อยู่ใน [PR #2](https://github.com/puaylengx/seamless_data/pull/2) (base `feat/aditayathorn-zeal-data`, รอ review) — ดู G2, G3, G9 ด้านล่าง
 > รายการ blocked ที่รอคำตอบจากนอกทีมดูที่ [`docs/pending-decisions.md`](pending-decisions.md)
 
@@ -44,7 +44,7 @@
 
 ### G2 · [Security Engineer + Pipeline Engineer] Production write ไม่ opt-in สำหรับ finance และ zeal_data; research มี flag แต่เปิดค้างไว้ — Security
 
-**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — finance ERP/master: [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`8303f81` guard, `bf8089e` `helpers/replace_guard.py`, `368a0d4` refactor ใช้ helper ร่วม); zeal_data: [PR #2](https://github.com/puaylengx/seamless_data/pull/2) (`c56e237`, `9a573c2`) เปลี่ยน `ZEAL_INSERT_MODE` default เป็น `append` — รอ review. guard ตัวเดียวใน `helpers/replace_guard.py` เรียกก่อนเปิด connection เสมอ; README บันทึกว่า `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag
+**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — finance ERP/master: [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`ca841f7` guard, `bdb8891` `helpers/replace_guard.py`, `faa53d6` refactor ใช้ helper ร่วม); zeal_data: [PR #2](https://github.com/puaylengx/seamless_data/pull/2) (`a7a971b`, `58e1976`) เปลี่ยน `ZEAL_INSERT_MODE` default เป็น `append` — รอ review. guard ตัวเดียวใน `helpers/replace_guard.py` เรียกก่อนเปิด connection เสมอ; README บันทึกว่า `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag
 
 **ทำแล้ว (2026-09-17):** ตรวจ `.env` จริงบนเครื่อง — `PUBLICATION_UPLOAD_BQ` และ `TRACK_EVAL_UPLOAD_BQ` เป็น `false` แล้ว (คนละเรื่องกับ guard ที่เพิ่ม เพราะ flag พวกนี้ควบคุมคนละปลายทาง) → **ยังต้องทำ:** เพิ่มใน pre-deployment checklist ว่า "reset flag เป็น false หลัง upload เสร็จ"
 
@@ -52,7 +52,7 @@
 
 ### G3 · [Data Quality Engineer] track_evaluation เขียน DB ต่อแม้ validation fail + validator แก้ข้อมูลเอง — Data quality, กติกาข้อ 3
 
-**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`95da117`): fail-fast แบบเดียวกับ publication (`sys.exit(1)`); coercion/fill ทั้งหมดอยู่ใน `transformer.coerce_and_clean()`; validator read-only; MSSQL และ BigQuery ผ่าน `_load_reviewed_template()` ตัวเดียวกัน; test 24 cases
+**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`d1b4193`): fail-fast แบบเดียวกับ publication (`sys.exit(1)`); coercion/fill ทั้งหมดอยู่ใน `transformer.coerce_and_clean()`; validator read-only; MSSQL และ BigQuery ผ่าน `_load_reviewed_template()` ตัวเดียวกัน; test 24 cases
 
 **ยัง blocked (PD-2):** reward ที่ parse ไม่ได้ยัง fillna(0) ตาม behavior เดิม (`TODO(PD-2)` ในโค้ด); score/weight ที่ non-numeric → NULL พร้อม WARNING ไม่ fail (ตัดสินแล้ว 2026-09-17 ว่าคงไว้ ผูกกับ PD-2) — **ต้องให้ Domain Expert Research ยืนยันว่า reward ว่าง = 0 จริง หรือควร reject**
 
@@ -110,7 +110,7 @@
 
 ### G9 · [DevOps] Log ของ validator/loader หายจริง ไม่ถูกบันทึกลงไฟล์ — Observability
 
-**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`fc9e557`): handler ผูกที่ `src` logger ด้วย, `propagate=False`, ปิด handler เดิมเมื่อเรียกซ้ำ; `tests/helpers/test_logger.py` ยืนยันว่า `src.*` warning ลงไฟล์จริง
+**สถานะ:** ✅ **แก้แล้ว (2026-09-17)** — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged (`5561b47`): handler ผูกที่ `src` logger ด้วย, `propagate=False`, ปิด handler เดิมเมื่อเรียกซ้ำ; `tests/helpers/test_logger.py` ยืนยันว่า `src.*` warning ลงไฟล์จริง
 
 **ยังไม่ทำ:** แทน `print()` ด้วย logger ในจุดที่เหลือ (finance/master/migrate/connection ~30 จุด); เพิ่ม job summary line (job, rows_in, rows_out, duration, status) ท้ายทุก run → ทำได้เลย
 
@@ -148,9 +148,9 @@
 
 ### ✅ Phase 0 — ทำทันทีก่อน upload รอบถัดไป (เสร็จ 2026-09-17)
 G2 opt-in flag finance/zeal · G3 fail-fast track_evaluation · G9 fix logger propagate
-→ [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged เข้า main `75a3c57` (5 commits: G9 `fc9e557` · G3 `95da117` · G2 `8303f81` + `bf8089e` + `368a0d4`) · pytest 24 → 74 passed
+→ [PR #1](https://github.com/puaylengx/seamless_data/pull/1) merged เข้า main `1d31962` (5 commits: G9 `5561b47` · G3 `d1b4193` · G2 `ca841f7` + `bdb8891` + `faa53d6`) · pytest 24 → 74 passed
 → [PR #2](https://github.com/puaylengx/seamless_data/pull/2) zeal_data half ของ G2 (3 commits) base `feat/aditayathorn-zeal-data` — รอ review; merge ได้เลยเพราะ helper อยู่บน main แล้ว
-→ **ทำแล้ว (2026-09-17):** `.env` จริง reset เป็น false; test ค้างบน main แก้แล้ว (`3280f36`); `fill_cost_owner` แยกไป `feat/finance-fill-cost-owner` รอ Finance ยืนยัน; ODBC 17→18 แยกไป `fix/odbc-driver-18` รอ DevOps review
+→ **ทำแล้ว (2026-09-17):** `.env` จริง reset เป็น false; test ค้างบน main แก้แล้ว (`0e4e61d`); `fill_cost_owner` แยกไป `feat/finance-fill-cost-owner` รอ Finance ยืนยัน; ODBC 17→18 แยกไป `fix/odbc-driver-18` รอ DevOps review
 
 ### Phase 1 — Sprint 1–2: ปิด critical gaps ด้าน quality/security
 G1 CI + tests research · G4 shared prepare + reconciliation · G7 TRUNCATE→DELETE + `docs/db-roles.md` · G16 gitleaks/pre-commit · G6 schema_migrations + `--dry-run`
