@@ -5,12 +5,18 @@ from urllib.parse import quote
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+
+from src.research.reconcile import Summary, fetch_summary_sql
 
 load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
+
+# key ที่ระบุ "ผลงานเดียวกัน" — ใช้ทั้ง BigQuery MERGE และ reconciliation distinct count
+MERGE_KEYS = ["product_code", "publication_year", "publication_month", "firstname", "lastname", "title"]
+YEAR_COL = "publication_year"
 
 _RENAME_MAP = {
     "WoS_with_JIF-P90": "wos_with_jif_p90",
@@ -73,17 +79,32 @@ def _prepare_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_to_mssql(df: pd.DataFrame) -> None:
-    df = _prepare_df(df)
+def _mssql_engine():
     conn_str = (
         f"mssql+pyodbc://{os.getenv('LOCAL_USERNAME')}:"
         f"{quote(os.getenv('LOCAL_PASSWORD'))}@"
         f"{os.getenv('LOCAL_HOST')}/{os.getenv('RESEARCH_DATABASE')}?"
         "driver=ODBC+Driver+17+for+SQL+Server"
     )
-    engine = create_engine(conn_str)
-    table = os.getenv("PUBLICATION_TABLE")
-    schema = os.getenv("SCHEMA_DEFAULT")
+    return create_engine(conn_str)
+
+
+def _mssql_target() -> tuple[str, str]:
+    return os.getenv("SCHEMA_DEFAULT"), os.getenv("PUBLICATION_TABLE")
+
+
+def _bq_tables() -> tuple[str, str]:
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset_id = os.getenv("GCP_DATASET_ID")
+    staging = f"{project_id}.{dataset_id}.{os.getenv('GCP_PUBLICATION_STAGING_TABLE', 'publication_staging')}"
+    prod = f"{project_id}.{dataset_id}.{os.getenv('GCP_PUBLICATION_TABLE_NAME', 'publications')}"
+    return staging, prod
+
+
+def load_to_mssql(df: pd.DataFrame) -> None:
+    df = _prepare_df(df)
+    engine = _mssql_engine()
+    schema, table = _mssql_target()
 
     try:
         df.to_sql(name=table, con=engine, schema=schema, index=False,
@@ -103,15 +124,7 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
 
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset_id = os.getenv("GCP_DATASET_ID")
-    staging_table = (
-        f"{project_id}.{dataset_id}."
-        f"{os.getenv('GCP_PUBLICATION_STAGING_TABLE', 'publication_staging')}"
-    )
-    prod_table = (
-        f"{project_id}.{dataset_id}."
-        f"{os.getenv('GCP_PUBLICATION_TABLE_NAME', 'publications')}"
-    )
+    staging_table, prod_table = _bq_tables()
 
     df = _prepare_df(df)
     bq = bigquery.Client(project=project_id)
@@ -130,7 +143,7 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     load_job.result()
     logger.info("✅ Loaded %d rows into %s", load_job.output_rows, staging_table)
 
-    merge_keys = ["product_code", "publication_year", "publication_month", "firstname", "lastname", "title"]
+    merge_keys = MERGE_KEYS
     update_columns = [c for c in prod_columns if c not in merge_keys]
     update_set = ",\n    ".join(f"{c} = S.{c}" for c in update_columns)
     merge_sql = f"""
@@ -152,6 +165,33 @@ def load_to_bigquery(df: pd.DataFrame) -> None:
     merge_job = bq.query(merge_sql)
     merge_job.result()
     logger.info("✅ Merge to %s completed", prod_table)
+
+
+# ── reconciliation (G4) ───────────────────────────────────────────────────────
+
+def mssql_summary(years: list[int], engine=None) -> Summary:
+    """สรุปแถว/ปี ที่อยู่ใน MSSQL จริงสำหรับปีที่เพิ่ง upload — engine ส่งมาได้เพื่อ test"""
+    engine = engine or _mssql_engine()
+    schema, table = _mssql_target()
+    with engine.connect() as conn:
+        return fetch_summary_sql(
+            execute=lambda sql: conn.execute(text(sql)).fetchall(),
+            table_fqn=f"[{schema}].[{table}]",
+            year_col=YEAR_COL, key_cols=MERGE_KEYS, years=years, label="MSSQL",
+        )
+
+
+def bq_summary(years: list[int], client=None) -> Summary:
+    """สรุปแถว/ปี ที่อยู่ใน BigQuery prod table จริง — client ส่งมาได้เพื่อ test"""
+    if client is None:
+        from google.cloud import bigquery
+        client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
+    _, prod_table = _bq_tables()
+    return fetch_summary_sql(
+        execute=lambda sql: [tuple(r.values()) for r in client.query(sql).result()],
+        table_fqn=f"`{prod_table}`",
+        year_col=YEAR_COL, key_cols=MERGE_KEYS, years=years, label="BigQuery",
+    )
 
 
 def export_to_excel(df: pd.DataFrame, output_path: Path) -> Path:
