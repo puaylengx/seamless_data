@@ -7,7 +7,7 @@
 | # | เรื่อง | ถามใคร | สถานะ | เปิดเมื่อ |
 |---|---|---|---|---|
 | PD-1 | `fill_cost_owner` fallback | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-17 |
-| PD-2 | `reward` ว่าง/parse ไม่ได้ = 0 ? (G3) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
+| PD-2 | `reward` ว่าง/parse ไม่ได้ = 0 ? (G3) | Domain Expert — Research | ⏳ รอคำตอบ (โค้ดมี `TODO(PD-2)` แล้ว) | 2026-09-17 |
 | PD-3 | natural key ของ `erp_2025` (G5) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-4 | source of truth: MSSQL vs BigQuery (G4) | Business owner ฝ่ายวิจัย | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-5 | grant จริงของ DB user ที่ pipeline ใช้ (G7) | DBA | ⏳ รอคำตอบ | 2026-09-17 |
@@ -27,7 +27,10 @@
 
 - **ถามใคร:** Domain Expert — Research
 - **ถามอะไร:** ใน track_evaluation ค่า `REWARD` ที่ว่างหรือไม่ใช่ตัวเลข ปัจจุบันถูกแทนด้วย 0 ก่อน insert — ถูกต้องตามเกณฑ์จริงหรือควร reject แถวนั้นให้คนแก้ไฟล์ก่อน
-- **ทำไมต้องถาม:** reward เป็นเงินจริงที่จ่ายนักวิชาการ การแทน 0 เงียบๆ = จ่ายขาด; Phase 0 คง behavior เดิมไว้พร้อม `TODO` ในโค้ด (`coerce_and_clean`)
+- **ทำไมต้องถาม:** reward เป็นเงินจริงที่จ่ายนักวิชาการ การแทน 0 เงียบๆ = จ่ายขาด; Phase 0 ([PR #1](https://github.com/puaylengx/seamless_data/pull/1)) คง behavior เดิมไว้พร้อม `TODO(PD-2)` ใน `src/research/track_evaluation/transformer.py::coerce_and_clean`
+- **ประเด็นพ่วง (ตัดสินภายในแล้ว 2026-09-17):** `score`/`weight`/`quality`/`contribution` ที่ non-numeric (เช่น "N/A") → NULL พร้อม WARNING ระบุแถว Excel ไม่ fail — PM ตัดสินให้คงไว้ก่อน ถ้าฝ่ายวิจัยตอบ PD-2 ว่า "ควร reject" ให้ทบทวน rule นี้พร้อมกัน
+- **ผลถ้าตอบ "0 ถูกต้อง":** ลบ TODO, เพิ่ม test ยืนยัน, บันทึก decision log
+- **ผลถ้าตอบ "ควร reject":** ย้ายจาก fillna(0) เป็น validator rule → fail-fast
 
 ## PD-3 · natural key ของ `erp_2025` (G5)
 
@@ -52,3 +55,14 @@
 - **ถามใคร:** หัวหน้าทีม / ผู้ใช้ dashboard หลัก
 - **ถามอะไร:** จะใช้เครื่องมืออะไร (Looker Studio / Power BI / Metabase / อื่น) และใครเป็นคนอนุมัติว่า role ไหนเห็นชื่อนักวิจัย + reward รายบุคคลได้
 - **ทำไมต้องถาม:** RBAC / authorized view / refresh schedule / Metric Dictionary ออกแบบไม่ได้ถ้าไม่รู้เครื่องมือและเจ้าของ policy
+
+---
+
+## ตัดสินภายในทีมแล้ว (ไม่ต้องรอนอกทีม) — เก็บไว้เป็น audit trail จนกว่าจะมี `docs/decisions/`
+
+| วันที่ | เรื่อง | ผล | อ้างอิง |
+|---|---|---|---|
+| 2026-09-17 | non-numeric `score`/`weight` ใน track_evaluation → NULL + WARNING หรือ fail? | คงเป็น WARNING (behavior เดิมของ path MSSQL) ผูกกับ PD-2 | G3, PR #1 |
+| 2026-09-17 | `MasterLoader` default `mode="replace"` ต้อง opt-in `ALLOW_REPLACE` ด้วยหรือไม่ | ต้อง — `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag (README) | G2, PR #1 |
+| 2026-09-17 | guard `ALLOW_REPLACE` copy ต่อ module หรือรวม? | รวมเป็น `helpers/replace_guard.py` ตัวเดียว ทุก loader import ร่วม | G2, PR #1/#2 |
+| 2026-09-17 | zeal_data half ของ G2 อยู่ branch ไหน | `fix/phase0-zeal-replace-guard` base `feat/aditayathorn-zeal-data` (module ยังไม่อยู่บน main) | PR #2 |
