@@ -64,7 +64,7 @@ class MasterLoader:
         Args:
             df:         DataFrame หลังผ่าน MasterTransformer แล้ว
             table_name: ชื่อ table เช่น "master_gl"
-            mode:       "replace" — ล้างแล้ว insert ใหม่ (default สำหรับ master)
+            mode:       "replace" — DELETE ทั้งตารางแล้ว insert ใหม่ (default สำหรับ master)
                                     ต้องตั้ง ALLOW_REPLACE=true ใน .env ไม่งั้น RuntimeError
                         "append"  — เพิ่มต่อท้าย
         """
@@ -73,7 +73,7 @@ class MasterLoader:
         if mode not in ("append", "replace"):
             raise ValueError("mode ต้องเป็น 'append' หรือ 'replace'")
         if mode == "replace":
-            ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{table_name}"')
+            ensure_replace_allowed(f'DELETE FROM "{SCHEMA}"."{table_name}" (ล้างทั้งตาราง)')
 
         cols = [c for c in _TABLE_COLUMNS[table_name] if c in df.columns]
         if self.created_by is not None:
@@ -88,7 +88,9 @@ class MasterLoader:
 
             with conn.cursor() as cur:
                 if mode == "replace":
-                    cur.execute(f'TRUNCATE TABLE "{SCHEMA}"."{table_name}"')
+                    # DELETE (DML) แทน TRUNCATE (ต้องสิทธิ์ TRUNCATE/owner) — G7 least privilege:
+                    # etl_writer มีแค่ SELECT/INSERT/DELETE ก็รัน replace ได้ และ rollback ได้ใน transaction เดียวกัน
+                    cur.execute(f'DELETE FROM "{SCHEMA}"."{table_name}"')
 
                 col_sql = ", ".join(f'"{c}"' for c in cols)
                 sql = f'INSERT INTO "{SCHEMA}"."{table_name}" ({col_sql}) VALUES %s'

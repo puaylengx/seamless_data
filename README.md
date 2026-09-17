@@ -8,7 +8,7 @@ Data pipeline (Finance / Research / Zeal Data) → PostgreSQL / MSSQL / BigQuery
 
 ## Destructive replace guard (Phase 0 · G2)
 
-`mode="replace"` ของทุก loader (TRUNCATE / DROP+CREATE ตารางปลายทาง) ถูกบล็อกโดย default
+`mode="replace"` ของทุก loader (DELETE ทั้งตาราง / DROP+CREATE ตารางปลายทาง) ถูกบล็อกโดย default
 ต้องตั้ง `ALLOW_REPLACE=true` ใน `.env` ชั่วคราวก่อนรัน แล้วรีเซ็ตกลับเป็น `false` ทันทีหลังเสร็จ
 
 > ⚠️ `python src/finance/master/main.py` ใช้ `replace` เป็น default อยู่แล้ว

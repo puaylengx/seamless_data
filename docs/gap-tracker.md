@@ -28,7 +28,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G1/G20 merged; เพิ่�
 
 - [x] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) merged `99f8759` — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
 - [ ] **G4** 🟠 · Data layering · [Pipeline] ✋ shared prepare สำหรับ MSSQL/BQ + reconciliation step (row count / per-year) · 🔒 ประกาศ source of truth รอ PD-4
-- [ ] **G7** 🟠 · Security (Least Privilege) · [Security] ✋ `TRUNCATE` → `DELETE FROM`, เขียน `docs/db-roles.md` (`etl_writer` / `schema_owner`) · 🔒 ตรวจ grant จริงรอ PD-5 (DBA)
+- [~] **G7** 🟠 · Security (Least Privilege) · [Security] PR #10 รอ review — finance ERP/master `replace` ใช้ `DELETE FROM` แทน `TRUNCATE` (DML อย่างเดียว, transaction เดียวกับ INSERT); [`docs/db-roles.md`](db-roles.md) role matrix `schema_owner` / `etl_writer` / `bi_reader` + query ตรวจสิทธิ์ PG/MSSQL/BQ + checklist; test ยืนยันไม่มี DDL ใน SQL ที่ loader ส่ง · 🔒 ตรวจ/ลด grant จริงรอ PD-5 (DBA) · ข้อยกเว้นที่รู้: zeal `replace` ยัง DROP+CREATE (ต้องรอ G6/G11)
 - [ ] **G16** 🟡 · Security · [Security] ✋ pre-commit + gitleaks, ย้าย SA JSON ออกนอก repo tree, `sqlalchemy.URL.create()` แทน f-string password
 - [ ] **G6** 🟠 · Data modeling · [Architect] ✋ ตาราง `schema_migrations` + `--dry-run` ใน `migrations/migrate.py`; ย้าย BQ DDL / reverse-engineer MSSQL schema เข้า `migrations/research/`
 

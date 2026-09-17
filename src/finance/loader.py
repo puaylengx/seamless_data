@@ -38,7 +38,7 @@ class ErpLoader:
         Args:
             df:         DataFrame หลังผ่าน transform และ validate แล้ว
             mode:       "append"  — เพิ่มข้อมูลต่อท้าย (default)
-                        "replace" — ล้างตารางแล้ว insert ใหม่ทั้งหมด
+                        "replace" — DELETE ทั้งตารางแล้ว insert ใหม่ทั้งหมด
                                     (ต้องตั้ง ALLOW_REPLACE=true ใน .env ไม่งั้น RuntimeError)
 
         Returns:
@@ -47,7 +47,7 @@ class ErpLoader:
         if mode not in ("append", "replace"):
             raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace' ได้รับ: '{mode}'")
         if mode == "replace":
-            ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{TABLE}"')
+            ensure_replace_allowed(f'DELETE FROM "{SCHEMA}"."{TABLE}" (ล้างทั้งตาราง)')
 
         cols = [c for c in _DB_COLUMNS if c in df.columns]
         if self.created_by is not None:
@@ -62,7 +62,9 @@ class ErpLoader:
 
             with conn.cursor() as cur:
                 if mode == "replace":
-                    cur.execute(f'TRUNCATE TABLE "{SCHEMA}"."{TABLE}"')
+                    # DELETE (DML) แทน TRUNCATE (ต้องสิทธิ์ TRUNCATE/owner) — G7 least privilege:
+                    # etl_writer มีแค่ SELECT/INSERT/DELETE ก็รัน replace ได้ และ rollback ได้ใน transaction เดียวกัน
+                    cur.execute(f'DELETE FROM "{SCHEMA}"."{TABLE}"')
 
                 col_sql = ", ".join(f'"{c}"' for c in cols)
                 sql = f'INSERT INTO "{SCHEMA}"."{TABLE}" ({col_sql}) VALUES %s'

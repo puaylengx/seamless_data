@@ -1,5 +1,5 @@
 """
-Guard สำหรับ destructive replace mode ของทุก loader (TRUNCATE / DROP+CREATE ตารางปลายทาง)
+Guard สำหรับ destructive replace mode ของทุก loader (DELETE ทั้งตาราง / DROP+CREATE ตารางปลายทาง)
 
 ใช้ env var ตัวเดียวทั้งโปรเจกต์: ALLOW_REPLACE (default "false")
 เปิดได้ด้วยค่า "true" เท่านั้น (ไม่สนตัวพิมพ์เล็ก-ใหญ่) — "1", "yes" ไม่นับ
@@ -22,7 +22,7 @@ def ensure_replace_allowed(context: str) -> None:
 
     Args:
         context: บอกว่าจะลบอะไร เพื่อให้ข้อความ error ชี้ชัด
-                 เช่น 'TRUNCATE "public"."erp_2025"' หรือ 'DROP+CREATE zeal.public.*'
+                 เช่น 'DELETE FROM "public"."erp_2025"' หรือ 'DROP+CREATE zeal.public.*'
     """
     if _is_enabled():
         return
