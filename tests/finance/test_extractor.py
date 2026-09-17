@@ -35,9 +35,13 @@ def test_master_tables():
 
 
 def test_default_paths():
-    """ERP_DIR และ MASTER_DIR ต้องมีอยู่จริง"""
-    assert ERP_DIR.exists(),    f"ไม่พบ ERP_DIR: {ERP_DIR}"
-    assert MASTER_DIR.exists(), f"ไม่พบ MASTER_DIR: {MASTER_DIR}"
+    """ERP_DIR / MASTER_DIR ต้องชี้ไปที่ data/finance/clean/{erp,master} ใต้ project root
+
+    ไม่เช็ค .exists() เพราะ data/ ถูก gitignore — บน CI ไม่มีโฟลเดอร์นี้ (และไม่ควรมี)
+    """
+    root = Path(__file__).resolve().parents[2]
+    assert ERP_DIR    == root / "data" / "finance" / "clean" / "erp"
+    assert MASTER_DIR == root / "data" / "finance" / "clean" / "master"
     print(f"✅ ERP_DIR    : {ERP_DIR}")
     print(f"✅ MASTER_DIR : {MASTER_DIR}")
 
