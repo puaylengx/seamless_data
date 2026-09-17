@@ -9,6 +9,8 @@ import sshtunnel
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
+from helpers.replace_guard import ensure_replace_allowed
+
 load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
@@ -79,17 +81,20 @@ def _engine_session(db_name: str):
 def load_all(tables: dict[str, pd.DataFrame], db_name: str | None = None) -> None:
     """
     Insert ทุกตารางใน dict เข้า PostgreSQL
-    ใช้ env vars: ZEAL_DB_NAME, ZEAL_SCHEMA, ZEAL_INSERT_MODE
+    ใช้ env vars: ZEAL_DB_NAME, ZEAL_SCHEMA, ZEAL_INSERT_MODE (default: append)
+    insert mode "replace" ต้องตั้ง ALLOW_REPLACE=true ด้วย ไม่งั้น RuntimeError ก่อนแตะ DB
     """
     db_name = db_name or _str("ZEAL_DB_NAME")
     if not db_name:
         raise ValueError("ระบุ ZEAL_DB_NAME ใน .env หรือส่ง db_name argument")
 
     schema = _str("ZEAL_SCHEMA", "public") or "public"
-    insert_mode = _str("ZEAL_INSERT_MODE", "replace") or "replace"
+    insert_mode = _str("ZEAL_INSERT_MODE", "append") or "append"
 
     if insert_mode not in ("replace", "append"):
         raise ValueError(f"ZEAL_INSERT_MODE ต้องเป็น 'replace' หรือ 'append' ได้รับ: '{insert_mode}'")
+    if insert_mode == "replace":
+        ensure_replace_allowed(f"DROP+CREATE ทุกตารางใน {db_name}.{schema}")
 
     with _engine_session(db_name) as engine:
         for original_name, df in tables.items():
