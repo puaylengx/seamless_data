@@ -23,6 +23,25 @@ TABLE  = "erp_2025"
 SCHEMA = "public"
 
 
+def replace_allowed() -> bool:
+    """mode="replace" (TRUNCATE ก่อน insert) ต้อง opt-in ผ่าน ALLOW_REPLACE=true เท่านั้น"""
+    return os.getenv("ALLOW_REPLACE", "false").strip().lower() == "true"
+
+
+def ensure_replace_allowed(target: str) -> None:
+    """
+    Guard ก่อนทำ destructive replace — raise RuntimeError ถ้ายังไม่ได้ opt-in
+    เรียกก่อนเปิด connection เสมอ เพื่อไม่แตะ DB เลยเมื่อไม่ผ่าน
+    """
+    if not replace_allowed():
+        raise RuntimeError(
+            f"mode='replace' จะ TRUNCATE {target} ทั้งตารางก่อน insert "
+            "— ถูกบล็อกไว้เพราะ ALLOW_REPLACE ไม่ได้ตั้งเป็น true ใน .env\n"
+            "ถ้าตั้งใจล้างข้อมูลจริง ให้ตั้ง ALLOW_REPLACE=true ชั่วคราว "
+            "แล้วรีเซ็ตกลับเป็น false ทันทีหลังรันเสร็จ (pre-deployment checklist)"
+        )
+
+
 class ErpLoader:
     """Load ERP DataFrame เข้าตาราง erp_2025 ใน PostgreSQL"""
 
@@ -38,12 +57,15 @@ class ErpLoader:
             df:         DataFrame หลังผ่าน transform และ validate แล้ว
             mode:       "append"  — เพิ่มข้อมูลต่อท้าย (default)
                         "replace" — ล้างตารางแล้ว insert ใหม่ทั้งหมด
+                                    (ต้องตั้ง ALLOW_REPLACE=true ใน .env ไม่งั้น RuntimeError)
 
         Returns:
             {"rows_inserted": int, "mode": str, "created_by": str | None}
         """
         if mode not in ("append", "replace"):
             raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace' ได้รับ: '{mode}'")
+        if mode == "replace":
+            ensure_replace_allowed(f'"{SCHEMA}"."{TABLE}"')
 
         cols = [c for c in _DB_COLUMNS if c in df.columns]
         if self.created_by is not None:
