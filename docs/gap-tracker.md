@@ -9,11 +9,11 @@
 | Phase | เสร็จ | กำลังทำ | ยังไม่เริ่ม | blocked บางส่วน |
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
-| Phase 1 | 0/5 | G1 (PR #6) | 4 | G4 (PD-4), G7 (PD-5) |
-| Phase 2 | 0/7 | — | 7 | G5 (PD-3), G10 (Finance), G13 (Finance master file) |
-| Phase 3 | 0/6 | G20 (PR #6) | 5 | G8 (PD-6), G12 (PD-6) |
+| Phase 1 | 1/5 (G1 ✅ PR #6 merged `99f8759`) | — | 4 | G4 (PD-4), G7 (PD-5) |
+| Phase 2 | 0/8 | — | 8 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8) |
+| Phase 3 | 1/6 (G20 ✅ PR #6) | — | 5 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-17 (G1/G20 → PR #6)_
+_อัปเดตล่าสุด: 2026-09-17 (G1/G20 merged; เพิ่ม G21)_
 
 ---
 
@@ -26,7 +26,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G1/G20 → PR #6)_
 
 ## Phase 1 — ปิด critical/high ด้าน quality + security (Sprint 1–2)
 
-- [~] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) รอ review — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
+- [x] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) merged `99f8759` — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
 - [ ] **G4** 🟠 · Data layering · [Pipeline] ✋ shared prepare สำหรับ MSSQL/BQ + reconciliation step (row count / per-year) · 🔒 ประกาศ source of truth รอ PD-4
 - [ ] **G7** 🟠 · Security (Least Privilege) · [Security] ✋ `TRUNCATE` → `DELETE FROM`, เขียน `docs/db-roles.md` (`etl_writer` / `schema_owner`) · 🔒 ตรวจ grant จริงรอ PD-5 (DBA)
 - [ ] **G16** 🟡 · Security · [Security] ✋ pre-commit + gitleaks, ย้าย SA JSON ออกนอก repo tree, `sqlalchemy.URL.create()` แทน f-string password
@@ -37,9 +37,10 @@ _อัปเดตล่าสุด: 2026-09-17 (G1/G20 → PR #6)_
 - [ ] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] ✋ migration `003` PK บน `master_*` · 🔒 natural key ของ `erp_2025` รอ PD-3
 - [ ] **G10** 🟠 · Data modeling, layering · [Architect] align type `ic_strategy`/`mu_strategy` กับ master, `v_finance_*` view · 🔒 rename `erp_2025` → fact table รอ Finance ยืนยัน structure ข้ามปี
 - [ ] **G6** (ต่อ) · [Architect] ✋ DDL research ทั้งหมดอยู่ใน `migrations/` เท่านั้น
-- [ ] **G11** 🟡 · Data layering · [Pipeline] ✋ unify pattern `extractor → transformer → validator → loader` ให้ research/zeal; `MasterValidator`
+- [ ] **G11** 🟡 · Data layering · [Pipeline] ✋ unify pattern `extractor → transformer → validator → loader` ให้ research/zeal; `MasterValidator` · **note:** publication `validate_publication` ยัง mutate df (เติม `publication_month` จาก `effective_date`) — เคสเดียวกับที่แก้ใน track_evaluation (G3) ต้องย้ายไป transformer พร้อมกัน (พบใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6))
 - [ ] **G15** 🟡 · Data modeling · [Architect] ✋ `helpers/fiscal.py` นิยาม fiscal year เดียว + validator cross-check `fiscal_year` vs `doc_date`
 - [ ] **G13** 🟡 · Data quality · [QA] ✋ referential check `gl_id`/`cost_ctr_id` กับ master ใน `ErpValidator`; timeliness (as-of) · 🔒 master file ใหม่รอฝ่ายการเงิน
+- [ ] **G21** 🟡 · Data quality · [QA + Domain Expert Research] Publication validator ไม่ตรวจ Year suffix (`"2023 (RC3)"` → `20233` เงียบๆ ผ่าน `get_clean_year`) และไม่ validate `rank` กับ `_VALID_RANKS` (`"Dr."` หลุดผ่าน) — พบระหว่างเขียน test ของ G1 ([PR #6](https://github.com/puaylengx/seamless_data/pull/6)) · 🔒 เกณฑ์ที่ถูกต้องรอ PD-8 · ✋ เพิ่ม range check ปี (เช่น 2000–2100) ทำได้เลย
 - [ ] **G14** 🟡 · CI/CD · [DevOps] ✋ pin versions, `pyproject.toml` (`pip install -e .`), Dockerfile (mdb-tools + ODBC 18)
 
 ## Phase 3 — observability / documentation / dashboard readiness
@@ -49,7 +50,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G1/G20 → PR #6)_
 - [ ] **G17** 🟡 · Config management · [Pipeline] ✋ ลบ hardcoded infra fallback (`SSH_HOST`, `DB_NAME`), รวม connection เป็น `helpers/connect_db/{postgres,mssql,bigquery}.py`
 - [ ] **G18** 🟢 · Documentation · [PM + ทุกคน] ✋ README module map, `docs/decisions/` decision log (ย้ายตาราง "ตัดสินภายในทีมแล้ว" จาก pending-decisions มา), แทน `print()` ที่เหลือ ~30 จุด (ค้างจาก G9)
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
-- [~] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`
+- [x] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`
 
 ---
 

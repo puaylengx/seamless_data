@@ -13,6 +13,7 @@
 | PD-5 | grant จริงของ DB user ที่ pipeline ใช้ (G7) | DBA | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-6 | dashboard tool + เจ้าของ access policy (G8, G12) | หัวหน้าทีม / ผู้ใช้ dashboard | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-7 | ลบ backup tags `backup/pre-rewrite/*` (17 tags, local เท่านั้น) | Project owner สั่งเอง | ⏳ **ครบกำหนด 2026-09-24** — ห้ามลบอัตโนมัติ | 2026-09-17 |
+| PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
 
 ---
 
@@ -64,6 +65,16 @@
 - **ทำไมต้องรอ:** tag เหล่านี้ยังชี้ commit เดิม (SHA เก่า) ไว้ใช้ย้อนกลับได้ถ้า PR #2/#3/#4 หรือ main มีปัญหา; ผลข้างเคียงคือ `git log --all --grep="Co-Authored-By: Claude"` ยังเห็น 11 commit เดิมผ่าน tag เหล่านี้จนกว่าจะลบ (ใช้ `--branches --remotes` แทนจะได้ 0)
 - **สำรองอื่นที่ไม่ได้อยู่ใน repo:** `~/Desktop/icit_project/icit_data/seamless_data-before-rewrite-2026-09-17.bundle` — ลบหรือเก็บต่อได้ตามสะดวก ไม่กระทบ repo
 - **ผลเมื่อลบแล้ว:** ย้ายรายการนี้ไปตาราง "ตัดสินภายในทีมแล้ว" พร้อมวันที่
+
+## PD-8 · Publication — Year suffix และรายการ rank ที่ถูกต้อง (G21)
+
+- **ถามใคร:** Domain Expert — Research
+- **ถามอะไร:**
+  1. cell "Year" ในไฟล์ต้นทางมี suffix อื่นนอกจากตัวเลขล้วนได้ไหม (เช่น `"2023 (RC3)"`) — ถ้ามี ควร **reject** แถวนั้น หรือ **strip suffix** แล้วใช้ปี
+  2. รายการ rank ที่ถูกต้องทั้งหมดคืออะไร — ตอนนี้ `_VALID_RANKS` มี 7 ค่า (Lecturer, Assoc.Prof., Support Staff, Asst.Prof., Prof., Asst.Lect., Academic Advisor) แต่ค่าที่ไม่อยู่ในรายการ (เช่น `"Dr."`) **หลุดผ่าน** ทุกชั้นโดยไม่ถูกตรวจ
+- **ทำไมต้องถาม:** `get_clean_year` ลบทุกตัวที่ไม่ใช่ตัวเลข → `"2023 (RC3)"` กลายเป็น `20233` เงียบๆ และ validator เช็คแค่ > 0; ทั้ง `publication_year` และ `publication_budget_year` (ปีงบสำหรับ KPI) จะผิดตามโดยไม่มี error — พบระหว่างเขียน test ของ G1 ([PR #6](https://github.com/puaylengx/seamless_data/pull/6))
+- **ทำได้เลยโดยไม่รอ:** เพิ่ม range check ปี (เช่น 2000–2100) ใน validator เพื่อจับ `20233` — ไม่ขึ้นกับคำตอบ
+- **ผลเมื่อได้คำตอบ:** ปรับ `get_clean_year` (reject/strip) + เพิ่ม rank check ใน `validate_publication` + test ใน G21
 
 ---
 
