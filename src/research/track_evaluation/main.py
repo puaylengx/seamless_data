@@ -1,7 +1,7 @@
 """
 Track evaluation pipeline
   template  — raw Excel → draft template for review
-  pipeline  — processed template → upload (via .env flags)
+  pipeline  — processed template → upload (via .env flags; validate fail → exit 1)
   export    — processed template → final Excel
   upload    — processed template → MSSQL
   upload_bq — processed template → BigQuery
@@ -17,7 +17,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from helpers.logger import get_styled_logger
-from src.research.track_evaluation.transformer import build_track_template
+from src.research.track_evaluation.transformer import UPLOAD_COLUMNS, build_track_template, coerce_and_clean
 from src.research.track_evaluation.validator import validate_track_evaluation
 from src.research.track_evaluation.loader import load_to_mssql, load_to_bigquery, export_to_excel
 
@@ -55,77 +55,31 @@ def run_template(input_path: str) -> Path:
     return output_path
 
 
-def run_upload(input_path: str) -> None:
-    logger.info("=" * 20 + " Start upload " + "=" * 20)
-    logger.info("Input: %s", input_path)
-
-    df = pd.read_excel(
-        input_path,
-        usecols=[
-            "Product Code", "RC Meeting", "Publication_month", "orderNum",
-            "Publication_year", "PublicationDate", "Firstname", "Lastname",
-            "Rank", "Division", "Description", "Weight", "Quality",
-            "Corresponding", "Contribution", "SCORE", "REWARD", "Title", "Source",
-        ],
-    )
+def _load_reviewed_template(input_path: str) -> pd.DataFrame:
+    """
+    อ่าน reviewed template → rename เป็นชื่อ DB → coerce_and_clean → validate
+    ใช้ร่วมกันทั้ง MSSQL และ BigQuery เพื่อให้สองปลายทางได้ข้อมูลชุดเดียวกัน
+    validate ไม่ผ่าน → sys.exit(1) ไม่เขียนข้อมูลเข้าปลายทางใดๆ
+    """
+    df = pd.read_excel(input_path, usecols=list(UPLOAD_COLUMNS))
     logger.info("Loaded %d rows × %d columns", len(df), len(df.columns))
 
-    df.rename(
-        columns={
-            "Product Code": "product_code",
-            "RC Meeting": "rc_meeting",
-            "Publication_month": "publication_month",
-            "orderNum": "order_num",
-            "Publication_year": "publication_year",
-            "PublicationDate": "publication_date",
-            "Firstname": "firstname",
-            "Lastname": "lastname",
-            "Rank": "rank",
-            "Division": "division",
-            "Description": "description",
-            "Weight": "weight",
-            "Quality": "quality",
-            "Corresponding": "corresponding",
-            "Contribution": "contribution",
-            "SCORE": "score",
-            "REWARD": "reward",
-            "Title": "title",
-            "Source": "source",
-        },
-        inplace=True,
-    )
-
-    # fill missing month/year/order_num from publication_date
-    if "publication_date" in df.columns:
-        df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce")
-
-        if "publication_year" in df.columns:
-            mask = df["publication_year"].isna() | (df["publication_year"].astype(str).str.strip() == "")
-            df.loc[mask, "publication_year"] = df.loc[mask, "publication_date"].dt.year
-            logger.info("เติม publication_year จาก publication_date แล้ว %d แถว", mask.sum())
-
-        if "publication_month" in df.columns:
-            mask = df["publication_month"].isna() | (df["publication_month"].astype(str).str.strip() == "")
-            df.loc[mask, "publication_month"] = df.loc[mask, "publication_date"].dt.strftime("%B")
-            logger.info("เติม publication_month จาก publication_date แล้ว %d แถว", mask.sum())
-
-        if "order_num" in df.columns:
-            mask = df["order_num"].isna()
-            df.loc[mask, "order_num"] = df.loc[mask, "publication_date"].dt.month
-            logger.info("เติม order_num จาก publication_date แล้ว %d แถว", mask.sum())
-
-    # round decimal columns to 2 places
-    for col in ["weight", "quality", "contribution", "score"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").apply(
-                lambda x: round(x, 2) if pd.notnull(x) else None
-            )
+    df = df.rename(columns=UPLOAD_COLUMNS)
+    df = coerce_and_clean(df)
 
     if not validate_track_evaluation(df):
-        logger.warning("⚠️ Validation พบข้อผิดพลาดบางส่วน แต่ยังดำเนินการ insert ต่อ")
+        logger.error("❌ Validation failed. ยกเลิกการเขียนข้อมูลลงฐานข้อมูล")
+        sys.exit(1)
+    logger.info("✅ Validation passed")
+    return df
 
+
+def run_upload(input_path: str) -> None:
+    logger.info("=" * 20 + " Start upload → MSSQL " + "=" * 20)
+    logger.info("Input: %s", input_path)
+    df = _load_reviewed_template(input_path)
     load_to_mssql(df)
-    logger.info("🏁 Upload complete")
+    logger.info("🏁 Upload MSSQL complete")
 
 
 def run_export(input_path: str) -> Path:
@@ -148,35 +102,7 @@ def _env_flag(name: str) -> bool:
 def run_upload_bq(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → BigQuery " + "=" * 20)
     logger.info("Input: %s", input_path)
-
-    df = pd.read_excel(
-        input_path,
-        usecols=[
-            "Product Code", "RC Meeting", "Publication_month", "orderNum",
-            "Publication_year", "PublicationDate", "Firstname", "Lastname",
-            "Rank", "Division", "Description", "Weight", "Quality",
-            "Corresponding", "Contribution", "SCORE", "REWARD", "Title", "Source",
-        ],
-    )
-    logger.info("Loaded %d rows × %d columns", len(df), len(df.columns))
-
-    df.rename(
-        columns={
-            "Product Code": "product_code", "RC Meeting": "rc_meeting",
-            "Publication_month": "publication_month", "orderNum": "order_num",
-            "Publication_year": "publication_year", "PublicationDate": "publication_date",
-            "Firstname": "firstname", "Lastname": "lastname", "Rank": "rank",
-            "Division": "division", "Description": "description", "Weight": "weight",
-            "Quality": "quality", "Corresponding": "corresponding",
-            "Contribution": "contribution", "SCORE": "score", "REWARD": "reward",
-            "Title": "title", "Source": "source",
-        },
-        inplace=True,
-    )
-
-    if not validate_track_evaluation(df):
-        logger.warning("⚠️ Validation พบข้อผิดพลาดบางส่วน แต่ยังดำเนินการ upload ต่อ")
-
+    df = _load_reviewed_template(input_path)
     load_to_bigquery(df)
     logger.info("🏁 Upload BigQuery complete")
 

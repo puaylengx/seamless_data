@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 
 from helpers.connect_db import connect_to_db, close_connection
+from helpers.replace_guard import ensure_replace_allowed
 
 load_dotenv(override=True)
 
@@ -38,12 +39,15 @@ class ErpLoader:
             df:         DataFrame หลังผ่าน transform และ validate แล้ว
             mode:       "append"  — เพิ่มข้อมูลต่อท้าย (default)
                         "replace" — ล้างตารางแล้ว insert ใหม่ทั้งหมด
+                                    (ต้องตั้ง ALLOW_REPLACE=true ใน .env ไม่งั้น RuntimeError)
 
         Returns:
             {"rows_inserted": int, "mode": str, "created_by": str | None}
         """
         if mode not in ("append", "replace"):
             raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace' ได้รับ: '{mode}'")
+        if mode == "replace":
+            ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{TABLE}"')
 
         cols = [c for c in _DB_COLUMNS if c in df.columns]
         if self.created_by is not None:

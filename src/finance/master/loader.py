@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 
 from helpers.connect_db import connect_to_db, close_connection
+from helpers.replace_guard import ensure_replace_allowed
 
 load_dotenv(override=True)
 
@@ -64,12 +65,15 @@ class MasterLoader:
             df:         DataFrame หลังผ่าน MasterTransformer แล้ว
             table_name: ชื่อ table เช่น "master_gl"
             mode:       "replace" — ล้างแล้ว insert ใหม่ (default สำหรับ master)
+                                    ต้องตั้ง ALLOW_REPLACE=true ใน .env ไม่งั้น RuntimeError
                         "append"  — เพิ่มต่อท้าย
         """
         if table_name not in _TABLE_COLUMNS:
             raise ValueError(f"ไม่รู้จัก table '{table_name}'\nที่รองรับ: {list(_TABLE_COLUMNS)}")
         if mode not in ("append", "replace"):
             raise ValueError(f"mode ต้องเป็น 'append' หรือ 'replace'")
+        if mode == "replace":
+            ensure_replace_allowed(f'TRUNCATE "{SCHEMA}"."{table_name}"')
 
         cols = [c for c in _TABLE_COLUMNS[table_name] if c in df.columns]
         if self.created_by is not None:
