@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from urllib.parse import quote
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -9,6 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import DECIMAL, NVARCHAR, Integer, Date
 
+from helpers.connect_db.urls import mssql_url
 from src.research.reconcile import Summary, fetch_summary_sql
 
 load_dotenv(override=True)
@@ -113,12 +113,8 @@ def _for_pyodbc(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _mssql_engine():
-    conn_str = (
-        f"mssql+pyodbc://{os.getenv('LOCAL_USERNAME')}:{quote(os.getenv('LOCAL_PASSWORD'))}@"
-        f"{os.getenv('LOCAL_HOST')}/{os.getenv('RESEARCH_DATABASE')}?"
-        "driver=ODBC+Driver+17+for+SQL+Server"
-    )
-    return create_engine(conn_str, fast_executemany=True)
+    # URL.create() แทน f-string — password ไม่โผล่ใน repr/traceback และ escape ถูกเสมอ (G16)
+    return create_engine(mssql_url(), fast_executemany=True)
 
 
 def _mssql_target() -> tuple[str, str]:
@@ -165,7 +161,7 @@ def load_to_mssql(df: pd.DataFrame) -> None:
 def load_to_bigquery(df: pd.DataFrame) -> None:
     from google.cloud import bigquery
 
-    key_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    key_path = os.path.expanduser(os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or "")
     if not key_path or not os.path.exists(key_path):
         raise FileNotFoundError(f"ไม่พบไฟล์คีย์ Service Account: {key_path}")
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
