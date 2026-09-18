@@ -21,6 +21,10 @@ _SDG_COLS = [f"sdg{i}" for i in range(1, 18)]
 
 _YEAR_COLS = ["publication_year", "publication_calendar_year", "publication_budget_year"]
 
+# ช่วงปีที่เป็นไปได้ (G21): get_clean_year ลบทุกอักขระที่ไม่ใช่ตัวเลข → "2023 (RC3)" กลายเป็น 20233 เงียบๆ
+# range check จับเคสนั้นได้โดยไม่ต้องรอนิยามจาก Research (PD-8 ยังถามต่อว่า Year มี suffix ได้ไหม)
+YEAR_MIN, YEAR_MAX = 2000, 2100
+
 
 def validate_publication(df: pd.DataFrame) -> bool:
     """
@@ -45,10 +49,14 @@ def validate_publication(df: pd.DataFrame) -> bool:
 
     for col in _YEAR_COLS:
         year = pd.to_numeric(df[col], errors="coerce")
-        mask = year.isna() | (year <= 0)
+        mask = year.isna() | ~year.between(YEAR_MIN, YEAR_MAX)
         if mask.any():
             rows = (df.index[mask] + _EXCEL_ROW_OFFSET).tolist()
-            logger.warning("Column '%s' ไม่ใช่ positive int ที่ Excel rows: %s", col, rows)
+            bad = year[mask].dropna().astype(int).unique().tolist()[:5]
+            logger.warning(
+                "Column '%s' ไม่อยู่ในช่วง %d–%d หรือว่าง ที่ Excel rows: %s (ค่าที่พบ เช่น %s)",
+                col, YEAR_MIN, YEAR_MAX, rows, bad,
+            )
             ok = False
 
     for col in _FLAG_COLS:
