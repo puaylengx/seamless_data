@@ -1,4 +1,4 @@
-"""G18: import ของ finance/main ต้องไม่ทำให้ handler ของ "src" logger ชี้ไป log file ของ module อื่น"""
+"""G18/G9: การ import module ที่มี get_styled_logger ต้องไม่ย้าย handler ของ "src" logger (entrypoint เท่านั้นที่เป็นเจ้าของ)"""
 import importlib
 import logging
 import sys
@@ -11,13 +11,15 @@ def _file_handlers(name):
     return [Path(h.baseFilename).name for h in logging.getLogger(name).handlers if isinstance(h, logging.FileHandler)]
 
 
-def test_erp_main_import_keeps_src_handlers_on_erp_log():
+def test_importing_pipeline_modules_leaves_src_handlers_untouched():
+    before = _file_handlers("src")
     for m in ("src.finance.main", "src.finance.master.main"):
         sys.modules.pop(m, None)
-    importlib.import_module("src.finance.main")
-    files = _file_handlers("src")
-    assert files and all(f.startswith("erp_") for f in files), files      # ไม่ใช่ master_*.log
-    print("✅ import finance.main → src logger เขียน erp_*.log ไม่ถูก master แย่ง")
+        importlib.import_module(m)
+    assert _file_handlers("src") == before                                   # import ≠ entrypoint → ไม่แย่ง src
+    assert all(f.startswith("erp_") for f in _file_handlers("src.finance.main"))
+    assert all(f.startswith("master_") for f in _file_handlers("src.finance.master.main"))
+    print("✅ import finance.main / master.main → src handlers ไม่เปลี่ยน, แต่ละ module มี log ของตัวเอง")
 
 
 def test_master_files_module_has_no_logger_side_effect():

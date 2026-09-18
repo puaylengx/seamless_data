@@ -11,15 +11,15 @@
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
 | Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
 | Phase 2 | 6/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16 · G5 PK ✅ #17 · G13 ✅ #18 · G21 ✅ #20) | — | 2 (G10 🔒, G6 MSSQL 🔒) | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 master ใหม่ (PD-13) + funds_ctr (PD-12), G21 (PD-8), G15 policy (PD-10) |
-| Phase 3 | 2/7 (G20 ✅ #6 · G17 ✅ #21) | G18 (PR #22) | 4 | G8 (PD-6), G12 (PD-6) |
+| Phase 3 | 3/7 (G20 ✅ #6 · G17 ✅ #21 · G18 ✅ #22) | G9 follow-up (PR #23) | 4 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-18 (G17 merged; G18 → #22)_
+_อัปเดตล่าสุด: 2026-09-18 (G17/G18 merged; G9 follow-up → #23)_
 
 ---
 
 ## ✅ Phase 0 — production-write safety (เสร็จ 2026-09-17)
 
-- [x] **G9** · Observability · [DevOps] log ของ validator/loader ลงไฟล์ผ่าน `src` logger — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) `5561b47`
+- [x] **G9** · Observability · [DevOps] log ของ validator/loader ลงไฟล์ผ่าน `src` logger — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) `5561b47` · **follow-up (PR #23):** เฉพาะ entrypoint `__main__` เป็นเจ้าของ `src` handlers — module ที่ถูก import ตั้ง logger ตัวเองได้แต่ไม่แย่ง `src` (กันเคสแบบ #22 ทั่วไป)
 - [x] **G3** · Data quality · [QA + Pipeline] track_evaluation fail-fast + `coerce_and_clean()` + validator read-only — [PR #1](https://github.com/puaylengx/seamless_data/pull/1) `d1b4193` · 🔒 ส่วน `reward`=0 รอ PD-2
 - [x] **G2** · Security · [Security + Pipeline] `ALLOW_REPLACE` guard ใน `helpers/replace_guard.py` — finance: [PR #1](https://github.com/puaylengx/seamless_data/pull/1) `ca841f7` `bdb8891` `faa53d6`
   - [~] zeal_data half — [PR #2](https://github.com/puaylengx/seamless_data/pull/2) รอ review (base `feat/aditayathorn-zeal-data`)
@@ -48,7 +48,7 @@ _อัปเดตล่าสุด: 2026-09-18 (G17 merged; G18 → #22)_
 - [ ] **G12** 🟡 · Documentation · [BI] ✋ `docs/metric-dictionary.md` skeleton · 🔒 นิยาม metric จริง + refresh schedule รอ PD-6 (dashboard tool)
 - [ ] **G8** 🟠 · Security (RBAC/PII) · [Security + BI] ✋ data classification table (column → sensitivity) · 🔒 authorized views / policy tags รอ PD-6
 - [x] **G17** 🟡 · Config management · [Pipeline + DevOps] [PR #21](https://github.com/puaylengx/seamless_data/pull/21) merged `b023350` — `helpers/connect_db/config.py` ตรวจ env ครบก่อนแตะ network, `MissingConfigError` บอกชื่อ var ที่ขาด**ทั้งหมด** + วิธีแก้ (ไม่มี fallback `192.168.64.2`/`ic_finance`/`localhost` แล้ว; เหลือ protocol default 22/5432/public) · `mssql.py` / `bigquery.py` factories ใช้ร่วม publication + track_evaluation (ลบ `_mssql_engine`/`_bq_tables` ที่ซ้ำ), `MSSQL_ODBC_DRIVER` ตั้งผ่าน env · `connection.py` print → logger · zeal PG tunnel ยังซ้ำอยู่บน branch zeal
-- [~] **G18** 🟢 · Documentation · [PM + ทุกคน] PR #22 รอ review — README quick start + module map · `docs/decisions/` 10 ไฟล์ (ย้ายตาราง "ตัดสินภายในทีมแล้ว" + เพิ่มการตัดสินใจจาก G4/G5/G13/G15) · `print()` → logger ครบ (finance ERP/master, research usage) + บรรทัด `JOB SUMMARY` ท้ายทุก run (ค้างจาก G9) · แก้ side effect ที่พบระหว่างทาง: `MASTER_FILES` ย้ายไป `master/files.py` เพราะ import `master.main` แย่ง handler ของ `src` logger
+- [x] **G18** 🟢 · Documentation · [PM + ทุกคน] [PR #22](https://github.com/puaylengx/seamless_data/pull/22) merged `002ac38` — README quick start + module map · `docs/decisions/` 10 ไฟล์ (ย้ายตาราง "ตัดสินภายในทีมแล้ว" + เพิ่มการตัดสินใจจาก G4/G5/G13/G15) · `print()` → logger ครบ (finance ERP/master, research usage) + บรรทัด `JOB SUMMARY` ท้ายทุก run (ค้างจาก G9) · แก้ side effect ที่พบระหว่างทาง: `MASTER_FILES` ย้ายไป `master/files.py` เพราะ import `master.main` แย่ง handler ของ `src` logger
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
 - [ ] **G22** 🟢 · Security / CI · [DevOps] ✋ CI gitleaks (gitleaks-action บน pull_request) สแกนเฉพาะ commit ของ PR ไม่ใช่ full history — เพิ่ม scheduled workflow (เช่น weekly) รัน `gitleaks git --log-opts=--all` แยกจาก PR check (full-history scan ล่าสุดทำในเครื่อง 2026-09-17 = 0 leaks, PR #11)
 - [x] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`
