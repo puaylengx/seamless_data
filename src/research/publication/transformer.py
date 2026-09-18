@@ -3,6 +3,8 @@ import calendar
 import numpy as np
 import pandas as pd
 
+from helpers.fiscal import fiscal_year
+
 _VALID_RANKS = [
     "Lecturer", "Assoc.Prof.", "Support Staff", "Asst.Prof.",
     "Prof.", "Asst.Lect.", "Academic Advisor",
@@ -238,11 +240,10 @@ def get_clean_year(df_data: pd.DataFrame) -> pd.Series:
 
 
 def get_clean_budget_year(df_data: pd.DataFrame) -> pd.Series:
-    # Fix: use cleaned month values (handles "2023-10" format) instead of raw Month column
-    year_clean = pd.to_numeric(get_clean_year(df_data), errors="coerce")
+    """ปีงบของผลงาน — นิยามเดียวกับ finance ผ่าน helpers/fiscal.py (ใช้ month ที่ clean แล้ว รองรับ "2023-10")"""
+    year_clean = get_clean_year(df_data)
     month = get_clean_publication_month(df_data)
-    year_budget = np.where(month >= 10, year_clean + 1, year_clean)
-    return pd.Series(year_budget, index=df_data.index).astype("Int64")
+    return fiscal_year(year_clean, month)
 
 
 def get_format_effective_date(df_data: pd.DataFrame) -> pd.Series:

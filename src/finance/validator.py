@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import pandas as pd
+
+from helpers.fiscal import fiscal_month, fiscal_year_from_date
+
+logger = logging.getLogger(__name__)
+
+_EXCEL_ROW_OFFSET = 2  # header row 1, data starts at row 2
 
 # nullable columns ตาม schema (ไม่มี NOT NULL)
 NULLABLE_COLUMNS = {
@@ -28,6 +36,7 @@ class ErpValidator:
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.errors: list[str] = []
+        self.warnings: list[str] = []   # ตรวจพบแต่ยังไม่ block (advisory) — ดู validate_fiscal_year_vs_doc_date
 
     def validate_required_columns(self) -> "ErpValidator":
         """column ที่ไม่ได้อยู่ใน NULLABLE_COLUMNS ต้องมีข้อมูลครบ ไม่มี NA"""
@@ -95,16 +104,52 @@ class ErpValidator:
 
         return self
 
+    def validate_fiscal_year_vs_doc_date(self) -> "ErpValidator":
+        """
+        Cross-check (G15): fiscal_year / fiscal_month ที่มากับไฟล์ Excel ต้องตรงกับที่ derive จาก doc_date
+        ตามนิยามเดียวใน helpers/fiscal.py (ปีงบเริ่ม ต.ค.)
+
+        ยังเป็น **WARNING ไม่ใช่ error** — ของใหม่ที่ไม่เคยตรวจมาก่อน ยังไม่รู้ว่าข้อมูลจริงมี mismatch
+        บ่อยแค่ไหน (เช่น ฝ่ายการเงินอาจ post ย้อนงวดโดยตั้งใจ) → เก็บสถิติจาก log ก่อน ค่อยตัดสินว่าจะ fail-fast
+        """
+        if "doc_date" not in self.df.columns:
+            return self
+        parsed = pd.to_datetime(self.df["doc_date"], format="%Y-%m-%d", errors="coerce")
+        checks = (
+            ("fiscal_year", fiscal_year_from_date(parsed)),
+            ("fiscal_month", fiscal_month(parsed.dt.month)),
+        )
+        for col, expected in checks:
+            if col not in self.df.columns:
+                continue
+            actual = pd.to_numeric(self.df[col], errors="coerce").astype("Int64")
+            comparable = actual.notna() & expected.notna()
+            mismatch = comparable & (actual != expected)
+            if not mismatch.any():
+                continue
+            rows = (self.df.index[mismatch] + _EXCEL_ROW_OFFSET).tolist()
+            sample = rows[:10]
+            msg = (
+                f"'{col}' จาก Excel ไม่ตรงกับที่คำนวณจาก doc_date {int(mismatch.sum())} แถว "
+                f"(จาก {int(comparable.sum())} ที่เทียบได้) ที่ Excel rows: {sample}{' …' if len(rows) > 10 else ''}"
+            )
+            self.warnings.append(msg)
+            logger.warning("⚠️ %s", msg)
+        return self
+
     def run(self) -> dict:
-        """รัน validation ทั้งหมด คืน dict สรุปผล"""
+        """รัน validation ทั้งหมด คืน dict สรุปผล — errors block การ load, warnings แค่รายงาน"""
         self.errors.clear()
+        self.warnings.clear()
         self.validate_required_columns()
         self.validate_doc_date_format()
         self.validate_bigint_columns()
         self.validate_amount()
+        self.validate_fiscal_year_vs_doc_date()
 
         passed = len(self.errors) == 0
         return {
             "passed": passed,
             "errors": self.errors.copy(),
+            "warnings": self.warnings.copy(),
         }

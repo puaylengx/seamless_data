@@ -185,3 +185,55 @@ if __name__ == "__main__":
     test_validate_bigint_invalid()
     test_validate_order_description_nullable()
     print("\nAll tests passed")
+
+
+# ── G15: cross-check fiscal_year / fiscal_month vs doc_date (advisory) ─────────
+
+def test_fiscal_cross_check_passes_when_consistent():
+    # _valid_df: doc_date 2024-12-03 → fiscal_year 2025, fiscal_month 3 (ต.ค.=1)
+    result = ErpValidator(_valid_df()).run()
+    assert result["passed"] and result["warnings"] == []
+
+
+def test_fiscal_cross_check_warns_but_does_not_fail():
+    import logging
+    df = _valid_df()
+    df["fiscal_year"] = pd.array([2024], dtype="Int64")   # Excel บอก 2024 แต่ doc_date ธ.ค. 2024 → ควรเป็น 2025
+    df["fiscal_month"] = pd.array([12], dtype="Int64")    # ควรเป็น 3
+    validator = ErpValidator(df)
+    with _caplog_at(logging.WARNING, "src.finance.validator") as records:
+        result = validator.run()
+    assert result["passed"] is True                       # ยังไม่ fail-fast — เก็บสถิติก่อน (G15)
+    assert len(result["warnings"]) == 2
+    assert any("'fiscal_year'" in w and "Excel rows: [2]" in w for w in result["warnings"])
+    assert any("'fiscal_month'" in w for w in result["warnings"])
+    assert any("fiscal_year" in r.getMessage() for r in records)
+    print("✅ fiscal cross-check: mismatch → WARNING + warnings[] ไม่ block")
+
+
+def test_fiscal_cross_check_skips_rows_without_comparable_values():
+    df = pd.concat([_valid_df(), _valid_df()], ignore_index=True)
+    df.loc[1, "doc_date"] = "bad-date"                    # แถวนี้ doc_date fail อยู่แล้ว (error) → ไม่เทียบ
+    result = ErpValidator(df).run()
+    assert result["passed"] is False                      # เพราะ doc_date format
+    assert result["warnings"] == []                       # แต่ไม่เตือน fiscal ผิดซ้อน
+
+
+class _caplog_at:
+    """context manager เก็บ log records ของ logger ที่กำหนด (ไฟล์นี้ยังรันแบบ __main__ ได้ ไม่พึ่ง caplog fixture)"""
+    def __init__(self, level, name):
+        import logging
+        self.logger = logging.getLogger(name)
+        self.level = level
+        self.records = []
+        self.handler = logging.Handler()
+        self.handler.emit = self.records.append
+
+    def __enter__(self):
+        self.logger.addHandler(self.handler)
+        self.logger.setLevel(self.level)
+        return self.records
+
+    def __exit__(self, *a):
+        self.logger.removeHandler(self.handler)
+        return False

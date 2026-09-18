@@ -29,6 +29,8 @@ def run(mode: str = "append") -> dict:
         for e in result["errors"]:
             print(f"      - {e}")
         sys.exit(1)
+    for w in result.get("warnings", []):
+        print(f"   ⚠️  {w}")
     print("   ✅ Validation passed")
 
     # 4. Load
