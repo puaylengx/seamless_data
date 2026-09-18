@@ -19,6 +19,8 @@
 | PD-11a | master `status`: นิยาม/ค่าที่ถูกต้องต่อตาราง (G11) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
 | PD-11b | `io_good_id 76530045` ซ้ำ 2 แถวเหมือนกัน — ลบ 1 แถวได้ไหม (G5, migration 004) | Domain Expert — Finance | ⏳ รอคำตอบ — **บล็อก 003 บน DB ที่มีแถวซ้ำ** | 2026-09-18 |
 | PD-11c | `Master_IO_Activity` ว่าง 0 แถว — ตั้งใจหรือไฟล์ผิด | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
+| PD-12 | `erp.funds_ctr` (3000–3008) เทียบกับ master ไหน — ไม่ใช่ `master_fund` (8 หลัก) (G13) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
+| PD-13 | รหัสใน ERP 2025 ที่ไม่อยู่ใน master ปัจจุบัน (gl 9, io_goods 126, io_project 10, io_work 9) — ขอไฟล์ master ใหม่ (G13) | Domain Expert — Finance | ⏳ รอไฟล์ | 2026-09-18 |
 
 ---
 
@@ -119,6 +121,20 @@
 - **พบ:** 0 แถวหลัง dropna → ตาราง `master_io_activities` ว่าง
 - **ถาม:** ตั้งใจ (ยังไม่มี activity) หรือไฟล์ผิด/ตกหล่น
 - **ตอนนี้:** ไม่กระทบ 003 (PK บนตารางว่างได้)
+
+## PD-12 · `erp.funds_ctr` ควรเทียบกับ master ตารางไหน (G13)
+
+- **ถามใคร:** Domain Expert — Finance
+- **พบ:** `erp_2025.funds_ctr` มีค่า 4 หลัก `3000`–`3008` (9 ค่า, ทุกแถว) แต่ `master_fund.fund_id` เป็น 8 หลัก `10101001`… (9 ค่า) → **ไม่มีค่าตรงกันเลย** — น่าจะเป็นคนละแนวคิดใน SAP (Fund vs Funds Center) ไม่ใช่รหัสใหม่
+- **ถาม:** funds_ctr คือ Funds Center ใช่ไหม มี master ของ Funds Center หรือไม่ (ยังไม่มีในไฟล์ที่ทีมได้รับ) หรือ `Master_FUND` คือ Fund คนละตาราง
+- **ตอนนี้:** ถอด `funds_ctr` ออกจาก `ERP_REFERENCES` (ไม่ตรวจ) เพื่อไม่เตือนผิด 100% · ถ้ามี master Funds Center ให้เพิ่มไฟล์ + mapping + migration ตารางใหม่
+
+## PD-13 · รหัสใน ERP 2025 ที่ยังไม่อยู่ใน master — ขอไฟล์ master รุ่นใหม่ (G13 ส่วน 🔒)
+
+- **ถามใคร:** Domain Expert — Finance (ผู้ดูแล master data)
+- **พบ (รัน ErpValidator กับไฟล์ ERP 2025 + master ในเครื่อง 2026-09-18, ไม่แตะ DB):** master ล่าสุดคือ 2022-11 … 2024-06 ส่วน ERP ถึง 2025-09 → รหัสที่ไม่อยู่ใน master: `gl_id` 9 รหัส/52 แถว (กลุ่ม `1203…`), `io_goods` 126 รหัส/148 แถว, `io_project` 10 รหัส/378 แถว, `io_work` 9 รหัส/9 แถว; `cost_ctr_id` ตรงครบ; `ic/mu_strategy` ใน ERP ว่างทั้งไฟล์; `io_activity` มี 866 แถวแต่ master ว่าง (PD-11c)
+- **ถาม:** ขอไฟล์ master ทุกตารางรุ่นล่าสุด (โดยเฉพาะ GL, IO Goods, IO Project) และยืนยันว่ารหัสเหล่านี้ถูกต้อง (ไม่ใช่พิมพ์ผิดใน ERP)
+- **ตอนนี้:** referential check เป็น **WARNING** (`strict_reference=False`) พร้อมรายการรหัส/แถว · เมื่อได้ master ใหม่และ warning เป็น 0 → เปิด `strict_reference=True` ให้ fail-fast (decision log)
 
 ---
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import pandas as pd
 
 from helpers.fiscal import fiscal_month, fiscal_year_from_date
+from src.finance.reference import normalize_key
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +35,25 @@ _BIGINT_COLS = {"fiscal_year", "fiscal_month", "trimester", "day", "month", "yea
 class ErpValidator:
     """ตรวจสอบความถูกต้องของ ERP DataFrame หลังจาก transform"""
 
-    def __init__(self, df: pd.DataFrame):
+    # timeliness thresholds (G13) — master เก่ากว่านี้ = เตือน; ยังไม่มีนิยาม SLA จากทีม → ค่าเริ่มต้นอธิบายได้
+    MASTER_MAX_AGE_DAYS = 365
+    DATA_MAX_AGE_DAYS = 120
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        reference: dict[str, set[str]] | None = None,
+        reference_as_of: dict[str, date | None] | None = None,
+        strict_reference: bool = False,
+        today: date | None = None,
+    ):
         self.df = df
         self.errors: list[str] = []
-        self.warnings: list[str] = []   # ตรวจพบแต่ยังไม่ block (advisory) — ดู validate_fiscal_year_vs_doc_date
+        self.warnings: list[str] = []   # ตรวจพบแต่ยังไม่ block (advisory) — fiscal cross-check, referential, timeliness
+        self.reference = reference or {}
+        self.reference_as_of = reference_as_of or {}
+        self.strict_reference = strict_reference   # True → ค่าที่ไม่อยู่ใน master เป็น error (เปิดเมื่อ master ครบ/ทันสมัย)
+        self.today = today or date.today()
 
     def validate_required_columns(self) -> "ErpValidator":
         """column ที่ไม่ได้อยู่ใน NULLABLE_COLUMNS ต้องมีข้อมูลครบ ไม่มี NA"""
@@ -137,6 +154,58 @@ class ErpValidator:
             logger.warning("⚠️ %s", msg)
         return self
 
+    def validate_referential(self) -> "ErpValidator":
+        """
+        Consistency (G13): ค่าใน erp column ต้องมีอยู่ใน master ที่อ้างถึง (funds_ctr → master_fund ฯลฯ)
+
+        default = WARNING เพราะ master files ปัจจุบัน (2022–2024) เก่ากว่า ERP 2025 — รหัสใหม่ที่ยังไม่อยู่ใน master
+        เป็นเรื่องคาดหมายจนกว่า Finance จะส่งไฟล์ใหม่ (G13 ส่วน 🔒) · strict_reference=True → error
+        """
+        for col, valid in self.reference.items():
+            if col not in self.df.columns or not valid:
+                continue
+            values = normalize_key(self.df[col])
+            present = values.notna() & (values != "")
+            missing = present & ~values.isin(valid)
+            if not missing.any():
+                continue
+            unknown = sorted(values[missing].unique().tolist())
+            rows = (self.df.index[missing] + _EXCEL_ROW_OFFSET).tolist()
+            msg = (
+                f"'{col}' มีค่าที่ไม่อยู่ใน master {int(missing.sum())} แถว "
+                f"({len(unknown)} รหัส เช่น {unknown[:5]}) ที่ Excel rows: {rows[:10]}{' …' if len(rows) > 10 else ''}"
+            )
+            if self.strict_reference:
+                self.errors.append(msg)
+            else:
+                self.warnings.append(msg)
+                logger.warning("⚠️ %s", msg)
+        return self
+
+    def validate_timeliness(self) -> "ErpValidator":
+        """
+        Timeliness (G13): (1) ข้อมูลล่าสุดในไฟล์เก่าแค่ไหนเทียบวันนี้ (2) master ที่ใช้เทียบเก่ากว่า threshold ไหม
+        รายงานเป็น warning — ไม่มี SLA ที่ตกลงกัน (threshold เป็นค่าเริ่มต้นใน class)
+        """
+        if "doc_date" in self.df.columns:
+            parsed = pd.to_datetime(self.df["doc_date"], format="%Y-%m-%d", errors="coerce")
+            if parsed.notna().any():
+                latest = parsed.max().date()
+                age = (self.today - latest).days
+                if age > self.DATA_MAX_AGE_DAYS:
+                    msg = f"doc_date ล่าสุดในไฟล์คือ {latest} ({age} วันก่อน) — เกิน {self.DATA_MAX_AGE_DAYS} วัน ข้อมูลอาจไม่ใช่รอบล่าสุด"
+                    self.warnings.append(msg)
+                    logger.warning("⚠️ %s", msg)
+        stale = []
+        for col, as_of in self.reference_as_of.items():
+            if as_of and (self.today - as_of).days > self.MASTER_MAX_AGE_DAYS:
+                stale.append(f"{col} (master as of {as_of}, {(self.today - as_of).days} วัน)")
+        if stale:
+            msg = f"master ที่ใช้เทียบเก่ากว่า {self.MASTER_MAX_AGE_DAYS} วัน: {', '.join(stale)} — รอไฟล์ใหม่จาก Finance (G13)"
+            self.warnings.append(msg)
+            logger.warning("⚠️ %s", msg)
+        return self
+
     def run(self) -> dict:
         """รัน validation ทั้งหมด คืน dict สรุปผล — errors block การ load, warnings แค่รายงาน"""
         self.errors.clear()
@@ -146,6 +215,8 @@ class ErpValidator:
         self.validate_bigint_columns()
         self.validate_amount()
         self.validate_fiscal_year_vs_doc_date()
+        self.validate_referential()
+        self.validate_timeliness()
 
         passed = len(self.errors) == 0
         return {

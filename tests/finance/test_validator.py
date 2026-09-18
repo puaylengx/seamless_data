@@ -189,9 +189,13 @@ if __name__ == "__main__":
 
 # ── G15: cross-check fiscal_year / fiscal_month vs doc_date (advisory) ─────────
 
+# วันที่ตรึงสำหรับ test ที่ดู warnings — timeliness (G13) ขึ้นกับ "วันนี้"; doc_date ใน _valid_df คือ 2024-12-03
+_TODAY = __import__("datetime").date(2025, 1, 15)
+
+
 def test_fiscal_cross_check_passes_when_consistent():
     # _valid_df: doc_date 2024-12-03 → fiscal_year 2025, fiscal_month 3 (ต.ค.=1)
-    result = ErpValidator(_valid_df()).run()
+    result = ErpValidator(_valid_df(), today=_TODAY).run()
     assert result["passed"] and result["warnings"] == []
 
 
@@ -200,7 +204,7 @@ def test_fiscal_cross_check_warns_but_does_not_fail():
     df = _valid_df()
     df["fiscal_year"] = pd.array([2024], dtype="Int64")   # Excel บอก 2024 แต่ doc_date ธ.ค. 2024 → ควรเป็น 2025
     df["fiscal_month"] = pd.array([12], dtype="Int64")    # ควรเป็น 3
-    validator = ErpValidator(df)
+    validator = ErpValidator(df, today=_TODAY)
     with _caplog_at(logging.WARNING, "src.finance.validator") as records:
         result = validator.run()
     assert result["passed"] is True                       # ยังไม่ fail-fast — เก็บสถิติก่อน (G15)
@@ -214,7 +218,7 @@ def test_fiscal_cross_check_warns_but_does_not_fail():
 def test_fiscal_cross_check_skips_rows_without_comparable_values():
     df = pd.concat([_valid_df(), _valid_df()], ignore_index=True)
     df.loc[1, "doc_date"] = "bad-date"                    # แถวนี้ doc_date fail อยู่แล้ว (error) → ไม่เทียบ
-    result = ErpValidator(df).run()
+    result = ErpValidator(df, today=_TODAY).run()
     assert result["passed"] is False                      # เพราะ doc_date format
     assert result["warnings"] == []                       # แต่ไม่เตือน fiscal ผิดซ้อน
 

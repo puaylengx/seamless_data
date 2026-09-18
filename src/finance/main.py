@@ -8,6 +8,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from src.finance import ErpExtractor, ErpTransformer, ErpValidator, ErpLoader
+from src.finance.master.main import MASTER_FILES
+from src.finance.reference import load_master_reference
 
 
 def run(mode: str = "append") -> dict:
@@ -21,9 +23,10 @@ def run(mode: str = "append") -> dict:
     df = ErpTransformer(df).run()
     print(f"   columns: {df.columns.tolist()}")
 
-    # 3. Validate
+    # 3. Validate — referential/timeliness เทียบกับไฟล์ master ในเครื่อง (G13, advisory)
     print("── Validate ─────────────────────────────")
-    result = ErpValidator(df).run()
+    reference, as_of = load_master_reference(MASTER_FILES)
+    result = ErpValidator(df, reference=reference, reference_as_of=as_of).run()
     if not result["passed"]:
         print("   ❌ Validation failed:")
         for e in result["errors"]:
