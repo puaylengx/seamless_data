@@ -1,30 +1,24 @@
 """
-PostgreSQL connection — รองรับทั้ง SSH tunnel และ direct
+PostgreSQL connection — รองรับทั้ง SSH tunnel และ direct (psycopg2)
+
+G17: ค่า config ทั้งหมดมาจาก .env ผ่าน helpers.connect_db.config.postgres_config() — ไม่มี fallback
+เป็นที่อยู่ infra ในโค้ด; ขาดค่าไหน MissingConfigError บอกชื่อครบก่อนเปิด connection
 """
-import os
+import logging
 import warnings
 from contextlib import contextmanager
 
 import psycopg2
 import sshtunnel
-from colorama import Fore, Style
 from cryptography.utils import CryptographyDeprecationWarning
 from dotenv import load_dotenv
+
+from helpers.connect_db.config import postgres_config
 
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 load_dotenv(override=True)
 
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-def _str(key: str, default: str | None = None) -> str | None:
-    v = os.getenv(key)
-    return v if v and v.strip() else default
-
-
-def _int(key: str, default: int) -> int:
-    v = os.getenv(key)
-    return int(v) if v and v.strip() else default
+logger = logging.getLogger(__name__)
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -35,24 +29,21 @@ def connect_to_db(database_name: str = None):
 
     Returns:
         (conn, tunnel) — tunnel เป็น None เมื่อใช้ direct
+    Raises:
+        MissingConfigError ก่อนแตะ network ถ้า .env ไม่ครบ
     """
-    db_name = database_name or _str("DB_NAME", "ic_finance")
-    mode = (_str("DB_CONNECTION_MODE", "ssh") or "ssh").lower()
-
+    cfg = postgres_config(database_name)
     tunnel = None
     conn = None
-
     try:
-        if mode == "ssh":
-            conn, tunnel = _connect_ssh(db_name)
+        if cfg["mode"] == "ssh":
+            conn, tunnel = _connect_ssh(cfg)
         else:
-            conn = _connect_direct(db_name)
-
-        print(f"{Fore.GREEN}[{mode.upper()}] Connected to '{db_name}' successfully!{Style.RESET_ALL}")
+            conn = _connect_direct(cfg)
+        logger.info("[%s] Connected to '%s' successfully", cfg["mode"].upper(), cfg["database"])
         return conn, tunnel
-
     except Exception as e:
-        print(f"{Fore.RED}Connection error ({mode}): {e}{Style.RESET_ALL}")
+        logger.error("Connection error (%s): %s", cfg["mode"], e)
         _safe_close(conn, tunnel)
         raise
 
@@ -60,7 +51,7 @@ def connect_to_db(database_name: str = None):
 def close_connection(conn=None, tunnel=None):
     """ปิด connection และ SSH tunnel อย่างปลอดภัย"""
     _safe_close(conn, tunnel)
-    print(f"{Fore.YELLOW}Connection closed{Style.RESET_ALL}")
+    logger.info("Connection closed")
 
 
 @contextmanager
@@ -80,55 +71,43 @@ def db_session(database_name: str = None):
 
 # ── internal ──────────────────────────────────────────────────────────────────
 
-def _connect_ssh(db_name: str):
-    tunnel_kwargs = dict(
-        ssh_address_or_host=(_str("SSH_HOST", "192.168.64.2"), _int("SSH_PORT", 22)),
-        ssh_username=_str("SSH_USERNAME"),
-        remote_bind_address=(_str("DB_HOST", "localhost"), _int("DB_PORT", 5432)),
-        local_bind_address=("127.0.0.1", 0),
+def _psycopg2_kwargs(cfg: dict, host: str, port: int) -> dict:
+    return dict(
+        database=cfg["database"],
+        user=cfg["user"],
+        password=cfg["password"],
+        host=host,
+        port=port,
+        connect_timeout=cfg["connect_timeout"],
+        application_name=cfg["application_name"],
+        keepalives=1,
+        keepalives_idle=cfg["keepalives_idle"],
+        keepalives_interval=cfg["keepalives_interval"],
+        keepalives_count=cfg["keepalives_count"],
     )
 
-    pkey = _str("SSH_PKEY")
-    if pkey:
-        tunnel_kwargs["ssh_pkey"] = pkey
-        tunnel_kwargs["ssh_private_key_password"] = _str("SSH_PKEY_PASSWORD")
+
+def _connect_ssh(cfg: dict):
+    tunnel_kwargs = dict(
+        ssh_address_or_host=(cfg["ssh_host"], cfg["ssh_port"]),
+        ssh_username=cfg["ssh_username"],
+        remote_bind_address=(cfg["host"], cfg["port"]),
+        local_bind_address=("127.0.0.1", 0),
+    )
+    if cfg["ssh_pkey"]:
+        tunnel_kwargs["ssh_pkey"] = cfg["ssh_pkey"]
+        tunnel_kwargs["ssh_private_key_password"] = cfg["ssh_pkey_password"]
     else:
-        tunnel_kwargs["ssh_password"] = _str("SSH_PASSWORD")
+        tunnel_kwargs["ssh_password"] = cfg["ssh_password"]
 
     tunnel = sshtunnel.SSHTunnelForwarder(**tunnel_kwargs)
     tunnel.start()
-
-    conn = psycopg2.connect(
-        database=db_name,
-        user=_str("DB_USERNAME"),
-        password=_str("DB_PASSWORD"),
-        host="127.0.0.1",
-        port=tunnel.local_bind_port,
-        connect_timeout=_int("DB_CONNECT_TIMEOUT", 10),
-        application_name=_str("DB_APP_NAME", "python-client"),
-        keepalives=1,
-        keepalives_idle=_int("DB_KEEPALIVES_IDLE", 30),
-        keepalives_interval=_int("DB_KEEPALIVES_INTERVAL", 10),
-        keepalives_count=_int("DB_KEEPALIVES_COUNT", 5),
-    )
+    conn = psycopg2.connect(**_psycopg2_kwargs(cfg, "127.0.0.1", tunnel.local_bind_port))
     return conn, tunnel
 
 
-def _connect_direct(db_name: str):
-    conn = psycopg2.connect(
-        database=db_name,
-        user=_str("DB_USERNAME"),
-        password=_str("DB_PASSWORD"),
-        host=_str("DB_HOST", "localhost"),
-        port=_int("DB_PORT", 5432),
-        connect_timeout=_int("DB_CONNECT_TIMEOUT", 10),
-        application_name=_str("DB_APP_NAME", "python-client"),
-        keepalives=1,
-        keepalives_idle=_int("DB_KEEPALIVES_IDLE", 30),
-        keepalives_interval=_int("DB_KEEPALIVES_INTERVAL", 10),
-        keepalives_count=_int("DB_KEEPALIVES_COUNT", 5),
-    )
-    return conn
+def _connect_direct(cfg: dict):
+    return psycopg2.connect(**_psycopg2_kwargs(cfg, cfg["host"], cfg["port"]))
 
 
 def _safe_close(conn=None, tunnel=None):
