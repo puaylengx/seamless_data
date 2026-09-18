@@ -142,6 +142,14 @@ def test_bigquery_config_expands_home_and_checks_file(monkeypatch, clean_env, tm
     print("✅ bigquery: ~ ขยายได้, ชื่อตารางประกอบจาก env")
 
 
+def test_bigquery_tables_do_not_require_key_file(monkeypatch, clean_env):
+    # CI จับได้: reconcile/bq_summary กับ client ที่ inject มา ต้องประกอบชื่อตารางได้โดยไม่มี key
+    _set(monkeypatch, GCP_PROJECT_ID="proj", GCP_DATASET_ID="Research")
+    assert bigquery_tables("GCP_TRACK_EVAL_STAGING_TABLE", "track_evaluation_staging", "GCP_TRACK_EVAL_TABLE_NAME", "track_evaluation")[1] == "proj.Research.track_evaluation"
+    with pytest.raises(MissingConfigError, match="GOOGLE_APPLICATION_CREDENTIALS"):
+        bigquery_config()
+
+
 def test_bigquery_missing_key_file_names_path(monkeypatch, clean_env, tmp_path):
     _set(monkeypatch, GOOGLE_APPLICATION_CREDENTIALS=str(tmp_path / "nope.json"), GCP_PROJECT_ID="p", GCP_DATASET_ID="d")
     with pytest.raises(MissingConfigError) as exc:

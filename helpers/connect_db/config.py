@@ -81,12 +81,20 @@ def mssql_config() -> dict:
     return {**cfg, "driver": env("MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server")}
 
 
+def bigquery_dataset() -> dict:
+    """แค่ project + dataset (ใช้ประกอบชื่อตาราง/query string) — ไม่ต้องมี key file"""
+    cfg = require(["GCP_PROJECT_ID", "GCP_DATASET_ID"], "BigQuery")
+    return {"project_id": cfg["GCP_PROJECT_ID"], "dataset_id": cfg["GCP_DATASET_ID"]}
+
+
 def bigquery_config() -> dict:
-    cfg = require(["GOOGLE_APPLICATION_CREDENTIALS", "GCP_PROJECT_ID", "GCP_DATASET_ID"], "BigQuery")
+    """สำหรับสร้าง client จริง — ต้องมี key file ด้วย"""
+    ds = bigquery_dataset()
+    cfg = require(["GOOGLE_APPLICATION_CREDENTIALS"], "BigQuery")
     key_path = os.path.expanduser(cfg["GOOGLE_APPLICATION_CREDENTIALS"])
     if not os.path.exists(key_path):
         raise MissingConfigError(
             [f"GOOGLE_APPLICATION_CREDENTIALS (ไฟล์ไม่พบ: {key_path})"],
             "BigQuery — key ต้องอยู่นอก repo เช่น ~/.config/seamless_data/",
         )
-    return {"key_path": key_path, "project_id": cfg["GCP_PROJECT_ID"], "dataset_id": cfg["GCP_DATASET_ID"]}
+    return {"key_path": key_path, **ds}
