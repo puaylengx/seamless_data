@@ -1,5 +1,5 @@
-# ── Dev / CI only — ติดตั้งเพิ่มจาก requirements.txt ─────────────────
+# ── Dev / CI only — ติดตั้งเพิ่มจาก requirements.txt (pinned, G14) ──────────
 # pip install -r requirements.txt -r requirements-dev.txt
-pytest>=8.0
-ruff>=0.6
-pre-commit>=3.0
+pytest==9.1.1
+ruff==0.16.8              # ให้ตรงกับ rev ใน .pre-commit-config.yaml
+pre-commit==4.6.2

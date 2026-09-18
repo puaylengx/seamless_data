@@ -1,26 +1,32 @@
-# ── PostgreSQL ────────────────────────────────────────────────
-psycopg2-binary>=2.9.9
-
-# ── SSH tunnel ────────────────────────────────────────────────
-sshtunnel>=0.4.0
-paramiko>=2.11.0,<3.0.0
-
-# ── MSSQL (research module) ───────────────────────────────────
-sqlalchemy>=2.0.0
-pyodbc>=5.0.0
-
-# ── Google Cloud BigQuery (research module) ───────────────────
-google-cloud-bigquery>=3.0.0
-google-cloud-bigquery[pandas]>=3.0.0
-pyarrow>=12.0.0
-
-# ── Environment ───────────────────────────────────────────────
-python-dotenv>=1.0.0
-
-# ── Console output ────────────────────────────────────────────
-colorama>=0.4.6
-colorlog>=6.7.0
+# ── Pinned runtime dependencies (G14) ─────────────────────────────────────────
+# ทุกตัว == เวอร์ชันที่ทดสอบผ่าน pytest ทั้ง suite (2026-09-18, Python 3.12 ใน CI/Docker, 3.14 บนเครื่อง dev)
+# เปลี่ยนเวอร์ชัน = PR แยก + รัน pytest + CI docker build ผ่านก่อน (pandas 3 เคยเปลี่ยน dtype ของ column string
+# แบบเงียบๆ จนต้องแก้โค้ดใน G3 — เหตุผลที่ต้อง pin)
+# ติดตั้ง: pip install -r requirements.txt   (dev/CI เพิ่ม -r requirements-dev.txt)
 
 # ── Data processing ───────────────────────────────────────────
-pandas>=2.0.0
-openpyxl>=3.1.0
+pandas==3.0.3
+numpy==2.4.6              # transitive ของ pandas แต่ pin ไว้เพราะ dtype behaviour ผูกกับ major version
+openpyxl==3.1.5
+pyarrow==24.0.0
+
+# ── PostgreSQL ────────────────────────────────────────────────
+psycopg2-binary==2.9.12
+
+# ── SSH tunnel ────────────────────────────────────────────────
+sshtunnel==0.4.0
+paramiko==2.12.0          # <3.0 ตาม constraint เดิม (sshtunnel 0.4 ยังใช้ API เก่า); cryptography 48 เตือน TripleDES — filter ใน pyproject
+cryptography==48.0.0
+
+# ── MSSQL (research module) ───────────────────────────────────
+SQLAlchemy==2.0.50
+pyodbc==5.3.0             # ต้องมี unixODBC + "ODBC Driver 18 for SQL Server" ในเครื่อง (ดู Dockerfile)
+
+# ── Google Cloud BigQuery (research module) ───────────────────
+google-cloud-bigquery==3.41.0
+db-dtypes==1.7.0          # ให้ google-cloud-bigquery[pandas] ทำงาน (แทน extras syntax เพื่อให้ pin ได้ตรง)
+
+# ── Environment / console ─────────────────────────────────────
+python-dotenv==1.2.2
+colorama==0.4.6
+colorlog==6.10.1

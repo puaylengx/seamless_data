@@ -1,0 +1,26 @@
+# credential / ข้อมูลจริง — ห้ามเข้า image เด็ดขาด
+.env
+.env.*
+!.env.example
+*.json
+configs/
+data/
+logs/
+*.pem
+*.key
+id_rsa*
+
+# local artefacts
+.venv/
+venv/
+.git/
+.github/
+.pre-commit-config.yaml
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+docs/
+*.md
+!README.md

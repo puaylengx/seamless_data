@@ -40,3 +40,20 @@ jobs:
       # ไม่มี secret/credential ใดๆ ใน job นี้ และไม่มี step ไหนแตะ production
       - name: Unit tests (pytest)
         run: python -m pytest tests -q
+
+  # ── G14: image ต้อง build ผ่าน (system deps: mdb-tools, ODBC 18) — ไม่ run container, ไม่แตะ DB ──
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (no push, no run)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          tags: seamless_data:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
