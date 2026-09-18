@@ -11,11 +11,11 @@
 | PD-2 | `reward` ว่าง/parse ไม่ได้ = 0 ? (G3) | Domain Expert — Research | ⏳ รอคำตอบ (โค้ดมี `TODO(PD-2)` แล้ว) | 2026-09-17 |
 | PD-3 | natural key ของ `erp_2025` (G5) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-4 | source of truth: MSSQL vs BigQuery (G4) | Business owner ฝ่ายวิจัย | ⏳ รอคำตอบ | 2026-09-17 |
-| PD-5 | grant จริงของ DB user ที่ pipeline ใช้ (G7) | DBA | ⏳ รอคำตอบ | 2026-09-17 |
+| PD-5 | grant จริงของ DB user ที่ pipeline ใช้ (G7/G8) — **รู้แล้วว่าเกินจำเป็น** ต้องการขอบเขตจริงเพื่อลดสิทธิ์ | DBA | ⏳ รอคำตอบ — query ตรวจเตรียมไว้แล้ว | 2026-09-17 |
 | PD-6 | dashboard tool + เจ้าของ access policy (G8, G12) | หัวหน้าทีม / ผู้ใช้ dashboard | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-7 | ลบ backup tags `backup/pre-rewrite/*` (17 tags, local เท่านั้น) | Project owner สั่งเอง | ⏳ **ครบกำหนด 2026-09-24** — ห้ามลบอัตโนมัติ | 2026-09-17 |
 | PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
-| PD-9 | MSSQL research DB จริงอยู่ที่ไหน (G6 ส่วน MSSQL DDL) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — **บล็อก G6 ส่วน MSSQL** | 2026-09-18 |
+| PD-9 | DB จริงอยู่ที่ไหน — **ทั้ง MSSQL research และ PostgreSQL finance** (`.env` ชี้ localhost/VM ที่ไม่ตอบ) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — บล็อก G6 MSSQL DDL **และ** การตรวจ grant PD-5 | 2026-09-18 |
 | PD-10 | fiscal_year จาก Excel ≠ derive จาก doc_date — จะ fail / ยึด doc_date / ยึด Excel (G15) | Domain Expert — Finance (หลังมีสถิติจาก log 2–3 รอบ) | ⏳ รอข้อมูลจริงก่อน แล้วรอคำตอบ | 2026-09-18 |
 | PD-11a | master `status`: นิยาม/ค่าที่ถูกต้องต่อตาราง (G11) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
 | PD-11b | `io_good_id 76530045` ซ้ำ 2 แถวเหมือนกัน — ลบ 1 แถวได้ไหม (G5, migration 004) | Domain Expert — Finance | ⏳ รอคำตอบ — **บล็อก 003 บน DB ที่มีแถวซ้ำ** | 2026-09-18 |
@@ -56,11 +56,41 @@
 - **ถามอะไร:** เมื่อสอง DB ไม่ตรงกัน ตัวไหนถือเป็นเลขอ้างอิง และอีกตัวมีไว้ทำอะไร (backup / ระบบเดิม / dashboard เท่านั้น)
 - **ทำไมต้องถาม:** ปัจจุบัน MSSQL ใช้ `append` (ซ้ำได้) ส่วน BQ ใช้ `MERGE` (upsert) — semantics ต่างกันโดยออกแบบ reconciliation check ต้องรู้ว่าเทียบกับใคร
 
-## PD-5 · grant จริงของ DB user ที่ pipeline ใช้ (G7)
+## PD-5 · grant จริงของ DB user ที่ pipeline ใช้ (G7 / G8)
 
 - **ถามใคร:** DBA (PostgreSQL `ic_finance` / zeal, MSSQL research)
-- **ถามอะไร:** user ใน `.env` มี privilege อะไรบ้างตอนนี้ (DDL? TRUNCATE? superuser?) และแยก role `etl_writer` / `schema_owner` ให้ได้ไหม
-- **ทำไมต้องถาม:** ตรวจจาก repo ไม่ได้; ทีมแก้โค้ดให้ไม่ต้องใช้ DDL ได้ (TRUNCATE → DELETE) แต่ลดสิทธิ์จริงต้อง DBA ทำ
+- **ถามอะไร:** user ใน `.env` มี privilege อะไรบ้างตอนนี้ และ **ใคร/role ไหนอีกที่ SELECT `erp_2025` ได้ตรงๆ** (ตาราง `details` มีชื่อบุคคลจริง = PII, ดู `data-classification.md`) แล้วแยก role `etl_writer` / `schema_owner` / `bi_reader` ตาม `db-roles.md`
+- **สิ่งที่รู้แน่จากโค้ดแล้ว (2026-09-18) — ไม่ใช่แค่ "ช่วยดู grant หน่อย":** user เดียวกันรันทั้ง pipeline และ `migrations/migrate.py` (สร้างตารางได้ → มี **CREATE/DDL**) และก่อน G7 โค้ดรัน `TRUNCATE TABLE` สำเร็จ (→ มี **TRUNCATE** ซึ่งปกติเป็นของ owner) ⇒ user นี้**มีสิทธิ์เกินความจำเป็นแน่นอน** สำหรับงาน INSERT/DELETE/SELECT; ที่ต้องการจาก DBA คือ**ขอบเขตจริง** (superuser? owner? มี role อื่นแชร์ตารางไหม) เพื่อลดสิทธิ์ให้ตรง `db-roles.md`
+- **ทำไมยังไม่ตรวจเอง:** ตรวจจาก repo ไม่ได้ และ DB ที่ `.env` ชี้ต่อไม่ได้ ณ 2026-09-18 (ดู PD-9) — ทีมพยายามแล้ว 2 ทาง (direct localhost:5432 → refused, SSH 192.168.x.x:22 → ไม่ตอบ)
+- **Query ที่ทีมจะรัน (หรือ DBA รันให้ได้เลย) — อ่าน catalog อย่างเดียว ไม่แตะข้อมูล, `SET default_transaction_read_only = on`:**
+
+```sql
+-- 1) ใครมีสิทธิ์อะไรบน erp_2025 (รวม PUBLIC)
+SELECT grantee, privilege_type, is_grantable
+  FROM information_schema.table_privileges
+ WHERE table_schema = current_schema() AND table_name = 'erp_2025' ORDER BY 1, 2;
+
+-- 2) owner + ACL ดิบ (จับ grant ให้ PUBLIC / role กลุ่ม)
+SELECT pg_get_userbyid(c.relowner) AS owner, c.relacl
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relname = 'erp_2025' AND n.nspname = current_schema();
+
+-- 3) role ทั้งหมด: superuser? login ได้? เป็นสมาชิก role ไหน (สิทธิ์สืบทอด)
+SELECT r.rolname, r.rolsuper, r.rolcanlogin, r.rolcreatedb, r.rolcreaterole,
+       ARRAY(SELECT b.rolname FROM pg_auth_members m JOIN pg_roles b ON b.oid = m.roleid WHERE m.member = r.oid) AS member_of
+  FROM pg_roles r WHERE r.rolname NOT LIKE 'pg\_%' ORDER BY 1;
+
+-- 4) user ของ pipeline เอง
+SELECT current_user, session_user,
+       has_table_privilege(current_user, 'erp_2025', 'SELECT')   AS can_select,
+       has_table_privilege(current_user, 'erp_2025', 'TRUNCATE') AS can_truncate,
+       has_schema_privilege(current_user, current_schema(), 'CREATE') AS can_create;
+
+-- 5) default privileges ที่จะทำให้ตารางใหม่เปิดกว้างอัตโนมัติ
+SELECT defaclrole::regrole, defaclnamespace::regnamespace, defaclobjtype, defaclacl FROM pg_default_acl;
+```
+- **ผ่านเกณฑ์เมื่อ:** pipeline user ไม่ใช่ superuser/owner, ไม่มี TRUNCATE/CREATE; `erp_2025` ไม่มี grant ให้ `PUBLIC`; role ที่ SELECT ได้มีเฉพาะ `etl_writer` + `schema_owner` (BI ผ่าน view เท่านั้น — G8/G10)
+- **ประเมิน exposure ปัจจุบัน (2026-09-18):** ไม่มี dashboard/BI ต่อ PostgreSQL อยู่ และ DB ไม่มีใครเข้าถึงได้เลยตอนนี้ (down) → ไม่ใช่เหตุฉุกเฉิน แต่คนที่เคยได้ `.env`/SSH key ชุดนี้อ่าน `details` ได้เต็มตาราง
 
 ## PD-6 · dashboard tool และเจ้าของ access policy (G8, G12)
 
@@ -86,13 +116,15 @@
 - **ทำได้เลยโดยไม่รอ:** เพิ่ม range check ปี (เช่น 2000–2100) ใน validator เพื่อจับ `20233` — ไม่ขึ้นกับคำตอบ
 - **ผลเมื่อได้คำตอบ:** ปรับ `get_clean_year` (reject/strip) + เพิ่ม rank check ใน `validate_publication` + test ใน G21
 
-## PD-9 · MSSQL research DB จริงอยู่ที่ไหน (G6 — reverse-engineer schema `publications` / `track_evaluation`)
+## PD-9 · DB จริงอยู่ที่ไหน — MSSQL research **และ** PostgreSQL finance (G6 / PD-5 / G8)
 
-- **ถามใคร:** DevOps เจ้าของ credential เดิม หรือคนที่ตั้งค่า `.env` ตอนแรก (ไม่ใช่ Project owner — ตอบเองไม่ได้)
-- **ถามอะไร:** `LOCAL_HOST=localhost` ใน `.env` ชี้ไปที่ MSSQL instance **บนเครื่องนี้** ซึ่งตอนนี้ **ไม่ได้รันอยู่** (ตรวจ 2026-09-18: port 1433 ไม่เปิด, ไม่มี docker container แม้ stopped, ไม่มี `sqlservr` process; มี `sqlcmd`/`mssql-tools18` ติดตั้งไว้) แต่มีหลักฐานว่าเคย upload ข้อมูลจริงเข้าไป (log `logs/research/*`) จึงไม่แน่ใจว่า
-  1. เป็น dev copy ที่ถูกลบ/ไม่ได้ start แล้ว → ต้องรู้วิธี start (image/volume ไหน) หรือ
-  2. ควรมี host จริงอื่นที่ทีมวิจัย query อยู่ → ต้องได้ host/port ที่ถูกต้องมาแทน `localhost`
-- **ทำไมต้องถาม:** G6 ต้องบันทึก schema MSSQL ปัจจุบันเป็น `migrations/research/mssql/001_*.sql` (source of truth) — reverse-engineer จาก `INFORMATION_SCHEMA`/`sys.*` เท่านั้น (query เตรียมไว้แล้ว read-only, ดู PR #13) ทำไม่ได้จนกว่าจะต่อ instance ที่ถูกต้อง; และถ้าเป็นข้อ 2 แปลว่า `.env` ทุกเครื่องชี้ผิดที่ → กระทบ upload/reconcile ทั้งหมด
+- **ถามใคร:** DevOps เจ้าของ credential เดิม หรือคนที่ตั้งค่า `.env` ตอนแรก (ไม่ใช่ Project owner — ตอบเองไม่ได้) — **คำถามเดียวกัน คนเดียวกัน ถามพร้อมกันทั้งสอง DB**
+- **MSSQL research:** `LOCAL_HOST=localhost` ใน `.env` ชี้ไปที่ MSSQL instance **บนเครื่องนี้** ซึ่งตอนนี้ **ไม่ได้รันอยู่** (ตรวจ 2026-09-18: port 1433 ไม่เปิด, ไม่มี docker container แม้ stopped, ไม่มี `sqlservr` process; มี `sqlcmd`/`mssql-tools18` ติดตั้งไว้) แต่มีหลักฐานว่าเคย upload ข้อมูลจริงเข้าไป (log `logs/research/*`)
+- **PostgreSQL finance (เพิ่ม 2026-09-18):** `.env` ปัจจุบัน `DB_CONNECTION_MODE=direct` → `localhost:5432` (`ic_finance`) — **ไม่มีอะไรฟัง** (ไม่มี process/brew service, Docker daemon ไม่รัน) · ในไฟล์ยังมี `SSH_HOST=192.168.x.x` (vmnet ของ macOS = VM) แต่ port 22 **ไม่ตอบ** · การออกแบบเดิม (`.env.example` รุ่นแรก, `docs/database.html`, fallback `192.168.64.2` ที่ G17 เพิ่งลบ) บอกว่า DB จริงอยู่ใน **VM ผ่าน SSH tunnel** · ไม่พบ UTM/Parallels/multipass/lima ในเครื่อง → VM อาจอยู่เครื่องอื่น/ถูกลบ
+- **ถามอะไร (ทั้งสอง DB):**
+  1. DB จริงอยู่ที่ไหน — VM `192.168.64.x` ใช่ไหม ใครเป็นเจ้าของ/ดูแล ตอนนี้เปิดอยู่ไหม start ยังไง (image/volume) หรือมี host จริงอื่นที่ควรใส่ใน `.env` แทน
+  2. ถ้าเป็น dev copy ที่หายไปแล้ว: ข้อมูลที่เคย upload (log ยืนยัน) ไปอยู่ที่ไหน — มีสำเนา/ backup ไหม
+- **ทำไมต้องถาม:** (MSSQL) G6 ต้องบันทึก schema ปัจจุบันเป็น `migrations/research/mssql/001_*.sql` — query read-only เตรียมไว้แล้ว (PR #13) · (PostgreSQL) ต้องตรวจ grant/exposure ของ `erp_2025` ที่มี PII (PD-5, query เตรียมไว้แล้ว) และ apply migration 003 · ถ้า `.env` ชี้ผิดที่ทั้งสอง DB แปลว่า upload/reconcile/migrate ทุกอย่างที่ผ่านมาทำกับ instance ที่ไม่มีใครดูแล
 - **สิ่งที่ตัดสินใจแล้ว:** **ห้าม start service/container เอง** แม้จะเจอวิธี — ถ้าเป็น DB จริงที่หายไปโดยไม่ตั้งใจ การ "แก้ให้" อาจทับสภาพที่ทีมอื่นตั้งใจปล่อยไว้ (Project owner 2026-09-18)
 - **ผลเมื่อได้คำตอบ:** รันสคริปต์ metadata dump เดิม → เขียน `001_*.sql` → ให้ Project owner ตรวจก่อน (ไม่ apply ที่ไหน)
 
