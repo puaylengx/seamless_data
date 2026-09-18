@@ -1,5 +1,7 @@
 import pandas as pd
 
+from helpers.fiscal import fiscal_month
+
 _NULL_VALUES = {"null", "none", "n/a", "na", "nan", "-", ""}
 
 # bigint columns ตาม schema
@@ -58,15 +60,12 @@ class ErpTransformer:
         return self
 
     def add_fiscal_month(self) -> "ErpTransformer":
-        """เพิ่ม column fiscal_month คำนวณจาก month (ต้อง convert_bigint_columns ก่อน)
-        ปีงบประมาณเริ่ม ต.ค. → fiscal_month 1 .. ก.ย. → fiscal_month 12
-        สูตร: ((month + 2) % 12) + 1
+        """เพิ่ม column fiscal_month จาก month (ต้อง convert_bigint_columns ก่อน)
+        นิยามปีงบอยู่ที่ helpers/fiscal.py ที่เดียว (เริ่ม ต.ค. → fiscal_month 1 .. ก.ย. → 12)
         """
         if "month" not in self.df.columns:
             return self
-        self.df["fiscal_month"] = (
-            (pd.to_numeric(self.df["month"], errors="coerce") + 2) % 12 + 1
-        ).astype("Int64")
+        self.df["fiscal_month"] = fiscal_month(self.df["month"])
         return self
 
     def convert_bigint_columns(self) -> "ErpTransformer":
