@@ -1,13 +1,13 @@
 import logging
-import os
 from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from helpers.connect_db.urls import mssql_url
+from helpers.connect_db.bigquery import bigquery_client, bigquery_tables
+from helpers.connect_db.mssql import mssql_engine, mssql_target
 from src.research.reconcile import Summary, fetch_summary_sql
 
 load_dotenv(override=True)
@@ -80,20 +80,15 @@ def _prepare_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _mssql_engine():
-    # URL.create() แทน f-string — password ไม่โผล่ใน repr/traceback และ escape ถูกเสมอ (G16)
-    return create_engine(mssql_url())
+    return mssql_engine()
 
 
 def _mssql_target() -> tuple[str, str]:
-    return os.getenv("SCHEMA_DEFAULT"), os.getenv("PUBLICATION_TABLE")
+    return mssql_target("PUBLICATION_TABLE")
 
 
 def _bq_tables() -> tuple[str, str]:
-    project_id = os.getenv("GCP_PROJECT_ID")
-    dataset_id = os.getenv("GCP_DATASET_ID")
-    staging = f"{project_id}.{dataset_id}.{os.getenv('GCP_PUBLICATION_STAGING_TABLE', 'publication_staging')}"
-    prod = f"{project_id}.{dataset_id}.{os.getenv('GCP_PUBLICATION_TABLE_NAME', 'publications')}"
-    return staging, prod
+    return bigquery_tables("GCP_PUBLICATION_STAGING_TABLE", "publication_staging", "GCP_PUBLICATION_TABLE_NAME", "publications")
 
 
 def load_to_mssql(df: pd.DataFrame) -> None:
@@ -113,17 +108,10 @@ def load_to_mssql(df: pd.DataFrame) -> None:
 def load_to_bigquery(df: pd.DataFrame) -> None:
     from google.cloud import bigquery
 
-    key_path = os.path.expanduser(os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or "")
-    if not key_path or not os.path.exists(key_path):
-        raise FileNotFoundError(f"ไม่พบไฟล์คีย์ Service Account: {key_path}")
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
-
-    project_id = os.getenv("GCP_PROJECT_ID")
     staging_table, prod_table = _bq_tables()
-
     df = _prepare_df(df)
-    bq = bigquery.Client(project=project_id)
-    logger.info("✅ BigQuery client initialized for project %s", project_id)
+    bq = bigquery_client()
+    logger.info("✅ BigQuery client initialized for project %s", bq.project)
 
     prod_schema = bq.get_table(prod_table).schema
     prod_columns = [c.name for c in prod_schema]
@@ -179,8 +167,7 @@ def mssql_summary(years: list[int], engine=None) -> Summary:
 def bq_summary(years: list[int], client=None) -> Summary:
     """สรุปแถว/ปี ที่อยู่ใน BigQuery prod table จริง — client ส่งมาได้เพื่อ test"""
     if client is None:
-        from google.cloud import bigquery
-        client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
+        client = bigquery_client()
     _, prod_table = _bq_tables()
     return fetch_summary_sql(
         execute=lambda sql: [tuple(r.values()) for r in client.query(sql).result()],

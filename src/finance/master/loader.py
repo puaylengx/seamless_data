@@ -12,7 +12,7 @@ from helpers.replace_guard import ensure_replace_allowed
 
 load_dotenv(override=True)
 
-SCHEMA = "public"
+SCHEMA = os.getenv("DB_SCHEMA", "public")   # schema default ของ PostgreSQL — override ได้ผ่าน .env (G17)
 
 # columns ที่ insert ต่อ table (ไม่รวม DB-managed: created_at, updated_at)
 _TABLE_COLUMNS: dict[str, list[str]] = {

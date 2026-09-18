@@ -10,10 +10,10 @@
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
 | Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
-| Phase 2 | 5/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16 · G5 PK ✅ #17 · G13 ✅ #18) | G21 (PR #20) | 2 (G10 🔒, G6 MSSQL 🔒) | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 master ใหม่ (PD-13) + funds_ctr (PD-12), G21 (PD-8), G15 policy (PD-10) |
-| Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
+| Phase 2 | 6/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16 · G5 PK ✅ #17 · G13 ✅ #18 · G21 ✅ #20) | — | 2 (G10 🔒, G6 MSSQL 🔒) | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 master ใหม่ (PD-13) + funds_ctr (PD-12), G21 (PD-8), G15 policy (PD-10) |
+| Phase 3 | 1/7 (G20 ✅ PR #6) | G17 (PR #21) | 5 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-18 (G13 merged; G21 → PR #20; Finance question pack ส่งแล้ว)_
+_อัปเดตล่าสุด: 2026-09-18 (Phase 2 งาน ✋ ครบ; G17 → PR #21)_
 
 ---
 
@@ -40,14 +40,14 @@ _อัปเดตล่าสุด: 2026-09-18 (G13 merged; G21 → PR #20; F
 - [x] **G11** 🟡 · Data layering · [Pipeline + QA] [PR #16](https://github.com/puaylengx/seamless_data/pull/16) merged `74a174c` — publication: `extractor.py` (read_raw ตรวจ column บังคับ / read_reviewed_template), template assembly ย้ายจาก main → `transformer.build_publication_template`, **validator read-only** (month-fill ย้ายไป `coerce_and_clean` ตาม pattern G3; test G1 ที่ assert mutation เขียนใหม่ให้ตรวจผ่าน transformer) · track_evaluation: `extractor.py` · finance master: `MasterValidator` (key ว่าง/ซ้ำ/column หาย → fail, status แปลก → warning) เข้า main ก่อน load · **zeal_data ยังไม่แตะ** (module อยู่ branch zeal — ทำหลัง #2/#7 merge)
 - [x] **G15** 🟡 · Data modeling · [Architect + QA] [PR #15](https://github.com/puaylengx/seamless_data/pull/15) merged `dd9d491` · 🔒 ตัดสิน fail/ยึด doc_date/ยึด Excel รอ PD-10 — `helpers/fiscal.py` (`FISCAL_YEAR_START_MONTH=10`, `fiscal_month` / `fiscal_year` / `fiscal_year_from_date`) ใช้ทั้ง finance `add_fiscal_month` และ research `get_clean_budget_year` — test พิสูจน์ผลเท่าสูตรเดิมทุกกรณีรวม NaN; `ErpValidator.validate_fiscal_year_vs_doc_date` cross-check `fiscal_year`/`fiscal_month` จาก Excel vs derive จาก `doc_date` → **WARNING + `result["warnings"]` ไม่ block** (เก็บสถิติก่อนตัดสิน fail-fast)
 - [x] **G13** 🟡 · Data quality · [QA] [PR #18](https://github.com/puaylengx/seamless_data/pull/18) merged `569c3ff` — `src/finance/reference.py` (reference sets จากไฟล์ master ผ่าน extractor/transformer เดิม, `normalize_key` ให้ NUMERIC 3.0 เทียบ TEXT '3' ได้, `master_as_of` จากชื่อไฟล์) · `ErpValidator.validate_referential` (WARNING default / `strict_reference=True` → error) + `validate_timeliness` (doc_date ล่าสุด > 120 วัน, master > 365 วัน → WARNING) ต่อเข้า finance main · รันกับไฟล์จริง: cost_ctr ตรงครบ, gl/io_goods/io_project/io_work มีรหัสใหม่ → 🔒 **PD-13** ขอ master ใหม่; `funds_ctr` คนละระบบรหัสกับ master_fund → ถอดออก 🔒 **PD-12**
-- [~] **G21** 🟡 · Data quality · [QA + Domain Expert Research] PR #20 รอ review — ✋ range check ปี 2000–2100 ใน `validate_publication` (จับ `"2023 (RC3)"` → 20233 ได้แล้ว, log บอกค่าที่พบ) · 🔒 แก้ `get_clean_year` (reject/strip suffix) + validate `rank` กับ `_VALID_RANKS` รอ PD-8
+- [x] **G21** 🟡 · Data quality · [QA + Domain Expert Research] [PR #20](https://github.com/puaylengx/seamless_data/pull/20) merged `d63e797` — ✋ range check ปี 2000–2100 ใน `validate_publication` (จับ `"2023 (RC3)"` → 20233 ได้แล้ว, log บอกค่าที่พบ) · 🔒 แก้ `get_clean_year` (reject/strip suffix) + validate `rank` กับ `_VALID_RANKS` รอ PD-8
 - [x] **G14** 🟡 · CI/CD · [DevOps] [PR #14](https://github.com/puaylengx/seamless_data/pull/14) merged `c7cce4d` — `requirements*.txt` pin `==` ทุกตัว (pandas 3.0.3, numpy 2.4.6, SQLAlchemy 2.0.50 …) ยืนยันใน fresh venv: 148 passed + `pip check` สะอาด; `Dockerfile` multi-stage (`runtime` ไม่มี dev deps/tests · `test` = runtime + dev + tests) python:3.12-slim + mdbtools + unixODBC + msodbcsql18, non-root, build-time assert ว่า ODBC 18 มีจริงและ pytest **ไม่** อยู่ใน runtime; `.dockerignore` กัน credential/data; CI job `docker-build` (build เท่านั้น) · `pyproject.toml` มีแล้วจาก G1
 
 ## Phase 3 — observability / documentation / dashboard readiness
 
 - [ ] **G12** 🟡 · Documentation · [BI] ✋ `docs/metric-dictionary.md` skeleton · 🔒 นิยาม metric จริง + refresh schedule รอ PD-6 (dashboard tool)
 - [ ] **G8** 🟠 · Security (RBAC/PII) · [Security + BI] ✋ data classification table (column → sensitivity) · 🔒 authorized views / policy tags รอ PD-6
-- [ ] **G17** 🟡 · Config management · [Pipeline] ✋ ลบ hardcoded infra fallback (`SSH_HOST`, `DB_NAME`), รวม connection เป็น `helpers/connect_db/{postgres,mssql,bigquery}.py`
+- [~] **G17** 🟡 · Config management · [Pipeline + DevOps] PR #21 รอ review — `helpers/connect_db/config.py` ตรวจ env ครบก่อนแตะ network, `MissingConfigError` บอกชื่อ var ที่ขาด**ทั้งหมด** + วิธีแก้ (ไม่มี fallback `192.168.64.2`/`ic_finance`/`localhost` แล้ว; เหลือ protocol default 22/5432/public) · `mssql.py` / `bigquery.py` factories ใช้ร่วม publication + track_evaluation (ลบ `_mssql_engine`/`_bq_tables` ที่ซ้ำ), `MSSQL_ODBC_DRIVER` ตั้งผ่าน env · `connection.py` print → logger · zeal PG tunnel ยังซ้ำอยู่บน branch zeal
 - [ ] **G18** 🟢 · Documentation · [PM + ทุกคน] ✋ README module map, `docs/decisions/` decision log (ย้ายตาราง "ตัดสินภายในทีมแล้ว" จาก pending-decisions มา), แทน `print()` ที่เหลือ ~30 จุด (ค้างจาก G9)
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
 - [ ] **G22** 🟢 · Security / CI · [DevOps] ✋ CI gitleaks (gitleaks-action บน pull_request) สแกนเฉพาะ commit ของ PR ไม่ใช่ full history — เพิ่ม scheduled workflow (เช่น weekly) รัน `gitleaks git --log-opts=--all` แยกจาก PR check (full-history scan ล่าสุดทำในเครื่อง 2026-09-17 = 0 leaks, PR #11)
