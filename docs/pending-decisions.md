@@ -3,6 +3,7 @@
 > เจ้าภาพติดตาม: **Project Manager** (กติกาข้อ 7) · DevOps เช็คซ้ำก่อน deploy ว่าเงื่อนไขผ่านแล้วจริง
 > อ้างอิงเลข gap จาก [`gap-analysis-2026-09.md`](gap-analysis-2026-09.md)
 > เมื่อได้คำตอบ: ย้ายรายการไป `docs/decisions/YYYY-MM-DD-<slug>.md` พร้อมวันที่/เหตุผล และผูกกับ migration/commit ที่เกี่ยว
+> **ชุดคำถามสำหรับฝ่ายการเงิน (PD-1, 3, 11a/b/c, 12, 13) เขียนแบบไม่ต้องรู้โค้ด:** [`finance-questions-2026-09.md`](finance-questions-2026-09.md) — PM ส่ง 2026-09-18; PD-10 ยังไม่ส่ง (ไฟล์ปัจจุบัน mismatch 0)
 
 | # | เรื่อง | ถามใคร | สถานะ | เปิดเมื่อ |
 |---|---|---|---|---|
@@ -29,6 +30,7 @@
 - **ถามใคร:** Domain Expert — Finance
 - **ถามอะไร:** เมื่อแถวใน ERP Excel มี `Cost_Owner` ว่าง ควรเติมด้วยค่า `CostCtr_ID` ของแถวนั้นหรือไม่ หรือควรปล่อยว่าง / reject
 - **ทำไมต้องถาม:** โค้ดนี้อยู่บน branch `feat/finance-fill-cost-owner` (commit `3b923e0`) **ยังไม่มี test และไม่มีบันทึกว่าฝ่ายการเงินขอ** — ถ้าเติมผิด dashboard จะรวมยอดเข้า owner ที่ไม่ใช่เจ้าของงบจริง
+- **หลักฐานจากไฟล์จริง (2026-09-18):** cost_owner ว่าง **3,362/6,726 แถว (50%)**; ในแถวที่มีค่า cost_owner == cost_ctr_id เพียง **2%** (ส่วนใหญ่เป็น `C3001100`) → กฎ fallback นี้ขัดกับ pattern จริง — น้ำหนักเอียงไปทาง "ไม่ใช้" แต่รอ Finance ยืนยัน (ดู finance-questions C1)
 - **ผลถ้าตอบ "ใช่":** เขียน `test_fill_cost_owner` + decision log แล้ว PR เข้า main
 - **ผลถ้าตอบ "ไม่":** ลบ branch ทิ้ง
 
@@ -46,6 +48,7 @@
 - **ถามใคร:** Domain Expert — Finance
 - **ถามอะไร:** ชุด column ใดที่ระบุ "รายการเดียวกัน" ได้แน่นอนในไฟล์ ERP (เช่น `doc_no + gl_id + cost_ctr_id + amount`? หรือมี line item number ที่ยังไม่ได้ export)
 - **ทำไมต้องถาม:** ต้องใช้สร้าง UNIQUE constraint / dedupe ให้ `append` รันซ้ำได้โดยไม่ double count — เดาเองผิด = ทิ้งแถวจริงหรือปล่อยแถวซ้ำ
+- **หลักฐานจากไฟล์จริง (2026-09-18):** ไม่มีชุด column ไหน unique — doc_no+gl_id+cost_ctr_id+amount ยังซ้ำ 108 แถว (ต่างกันแค่ details เช่น ชื่อผู้รับรางวัล), รวม details แล้วเหลือซ้ำเป๊ะ 2 แถว (Excel 904–905) → ต้องถาม Finance ว่า ERP มี line item number ไหม (finance-questions B1)
 
 ## PD-4 · source of truth ระหว่าง MSSQL กับ BigQuery (G4)
 
@@ -98,6 +101,7 @@
 - **ถามใคร:** Domain Expert — Finance
 - **ถามอะไร:** เมื่อไฟล์ ERP ระบุ `fiscal_year`/`fiscal_month` ต่างจากที่นิยาม `helpers/fiscal.py` (ปีงบเริ่ม ต.ค.) คำนวณจาก `doc_date` ควร (1) **fail-fast** ไม่โหลด (2) **ยึด doc_date** คำนวณทับ หรือ (3) **ยึด Excel** เพราะฝ่ายการเงิน post ย้อนงวดโดยตั้งใจ
 - **ทำไมยังไม่ถาม/ยังไม่ทำ:** เป็น check ใหม่ ([PR #15](https://github.com/puaylengx/seamless_data/pull/15)) ยังไม่มีข้อมูลว่าไฟล์จริง mismatch บ่อยแค่ไหน → ตอนนี้ `ErpValidator` แค่ **WARNING** (`result["warnings"]`) ไม่ block เพื่อไม่ทำผิดซ้ำแบบ G3 ที่ fail-fast ก่อนรู้ scope
+- **สถิติรอบแรก (ไฟล์ clean_ERP_2025.xlsx, 2026-09-18):** fiscal_year mismatch 0 / fiscal_month mismatch 0 จาก 6,726 แถว → ยังไม่มีอะไรถาม
 - **ขั้นตอน:** รัน finance pipeline จริง 2–3 รอบ → รวมสถิติ mismatch (จำนวน/สัดส่วน/รูปแบบ เช่น กระจุกที่เดือนไหน) จาก log → นำไปถาม Finance พร้อมตัวเลข → ตัดสิน → เปลี่ยน validator ตามผล + decision log
 - **ผูกกับ:** G15 (tracker), G13 (DQ consistency), Metric Dictionary G12 (นิยามปีงบต้องอยู่ที่นั่นด้วย)
 
