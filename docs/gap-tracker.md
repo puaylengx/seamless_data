@@ -10,10 +10,10 @@
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
 | Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
-| Phase 2 | 3/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16) | G5 (PR #17) | 4 | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 (Finance master file), G21 (PD-8), G15 policy (PD-10) |
+| Phase 2 | 4/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16 · G5 PK ✅ #17) | G13 (PR #18) | 3 | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 master ใหม่ (PD-13) + funds_ctr (PD-12), G21 (PD-8), G15 policy (PD-10) |
 | Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-18 (G11 merged; G5 → PR #17)_
+_อัปเดตล่าสุด: 2026-09-18 (G5 merged; G13 → PR #18)_
 
 ---
 
@@ -34,12 +34,12 @@ _อัปเดตล่าสุด: 2026-09-18 (G11 merged; G5 → PR #17)_
 
 ## Phase 2 — architecture / modeling (Sprint 3–4)
 
-- [~] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] PR #17 — **PK master ✅** `003_add_master_primary_keys.sql` (ADD PRIMARY KEY อย่างเดียว key = `MasterValidator.KEY_COLUMNS`; ไม่ลบข้อมูล; พิสูจน์บน PG16 ชั่วคราวว่า DB ที่มี `76530045` ซ้ำ → `UniqueViolation` → rollback ทั้ง transaction, หลัง dedupe → PK 9 ตาราง + `schema_migrations` ครบ) · **dedupe io_goods 🔒 PD-11b** `004_dedupe_io_goods.sql` (`-- migrate: manual` → migrate.py ข้ามเสมอ, apply ได้เฉพาะ `--only`) · apply จริงต้อง `--dry-run` บน staging ก่อน (DevOps) · 🔒 natural key `erp_2025` รอ PD-3
+- [x] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] [PR #17](https://github.com/puaylengx/seamless_data/pull/17) merged `547db92` — **PK master ✅** `003_add_master_primary_keys.sql` (ADD PRIMARY KEY อย่างเดียว key = `MasterValidator.KEY_COLUMNS`; ไม่ลบข้อมูล; พิสูจน์บน PG16 ชั่วคราวว่า DB ที่มี `76530045` ซ้ำ → `UniqueViolation` → rollback ทั้ง transaction, หลัง dedupe → PK 9 ตาราง + `schema_migrations` ครบ) · **dedupe io_goods 🔒 PD-11b** `004_dedupe_io_goods.sql` (`-- migrate: manual` → migrate.py ข้ามเสมอ, apply ได้เฉพาะ `--only`) · apply จริงต้อง `--dry-run` บน staging ก่อน (DevOps) · 🔒 natural key `erp_2025` รอ PD-3
 - [ ] **G10** 🟠 · Data modeling, layering · [Architect] align type `ic_strategy`/`mu_strategy` กับ master, `v_finance_*` view · 🔒 rename `erp_2025` → fact table รอ Finance ยืนยัน structure ข้ามปี
 - [ ] **G6** (ต่อ) · [Architect] BQ `track_evaluation` DDL ยังไม่มีใน repo (ไม่เคยมี) — ดึง schema จาก `client.get_table()` (metadata) ต้องขออนุญาตแยกเหมือน MSSQL · MSSQL 🔒 PD-9
 - [x] **G11** 🟡 · Data layering · [Pipeline + QA] [PR #16](https://github.com/puaylengx/seamless_data/pull/16) merged `74a174c` — publication: `extractor.py` (read_raw ตรวจ column บังคับ / read_reviewed_template), template assembly ย้ายจาก main → `transformer.build_publication_template`, **validator read-only** (month-fill ย้ายไป `coerce_and_clean` ตาม pattern G3; test G1 ที่ assert mutation เขียนใหม่ให้ตรวจผ่าน transformer) · track_evaluation: `extractor.py` · finance master: `MasterValidator` (key ว่าง/ซ้ำ/column หาย → fail, status แปลก → warning) เข้า main ก่อน load · **zeal_data ยังไม่แตะ** (module อยู่ branch zeal — ทำหลัง #2/#7 merge)
 - [x] **G15** 🟡 · Data modeling · [Architect + QA] [PR #15](https://github.com/puaylengx/seamless_data/pull/15) merged `dd9d491` · 🔒 ตัดสิน fail/ยึด doc_date/ยึด Excel รอ PD-10 — `helpers/fiscal.py` (`FISCAL_YEAR_START_MONTH=10`, `fiscal_month` / `fiscal_year` / `fiscal_year_from_date`) ใช้ทั้ง finance `add_fiscal_month` และ research `get_clean_budget_year` — test พิสูจน์ผลเท่าสูตรเดิมทุกกรณีรวม NaN; `ErpValidator.validate_fiscal_year_vs_doc_date` cross-check `fiscal_year`/`fiscal_month` จาก Excel vs derive จาก `doc_date` → **WARNING + `result["warnings"]` ไม่ block** (เก็บสถิติก่อนตัดสิน fail-fast)
-- [ ] **G13** 🟡 · Data quality · [QA] ✋ referential check `gl_id`/`cost_ctr_id` กับ master ใน `ErpValidator`; timeliness (as-of) · 🔒 master file ใหม่รอฝ่ายการเงิน
+- [~] **G13** 🟡 · Data quality · [QA] PR #18 รอ review — `src/finance/reference.py` (reference sets จากไฟล์ master ผ่าน extractor/transformer เดิม, `normalize_key` ให้ NUMERIC 3.0 เทียบ TEXT '3' ได้, `master_as_of` จากชื่อไฟล์) · `ErpValidator.validate_referential` (WARNING default / `strict_reference=True` → error) + `validate_timeliness` (doc_date ล่าสุด > 120 วัน, master > 365 วัน → WARNING) ต่อเข้า finance main · รันกับไฟล์จริง: cost_ctr ตรงครบ, gl/io_goods/io_project/io_work มีรหัสใหม่ → 🔒 **PD-13** ขอ master ใหม่; `funds_ctr` คนละระบบรหัสกับ master_fund → ถอดออก 🔒 **PD-12**
 - [ ] **G21** 🟡 · Data quality · [QA + Domain Expert Research] Publication validator ไม่ตรวจ Year suffix (`"2023 (RC3)"` → `20233` เงียบๆ ผ่าน `get_clean_year`) และไม่ validate `rank` กับ `_VALID_RANKS` (`"Dr."` หลุดผ่าน) — พบระหว่างเขียน test ของ G1 ([PR #6](https://github.com/puaylengx/seamless_data/pull/6)) · 🔒 เกณฑ์ที่ถูกต้องรอ PD-8 · ✋ เพิ่ม range check ปี (เช่น 2000–2100) ทำได้เลย
 - [x] **G14** 🟡 · CI/CD · [DevOps] [PR #14](https://github.com/puaylengx/seamless_data/pull/14) merged `c7cce4d` — `requirements*.txt` pin `==` ทุกตัว (pandas 3.0.3, numpy 2.4.6, SQLAlchemy 2.0.50 …) ยืนยันใน fresh venv: 148 passed + `pip check` สะอาด; `Dockerfile` multi-stage (`runtime` ไม่มี dev deps/tests · `test` = runtime + dev + tests) python:3.12-slim + mdbtools + unixODBC + msodbcsql18, non-root, build-time assert ว่า ODBC 18 มีจริงและ pytest **ไม่** อยู่ใน runtime; `.dockerignore` กัน credential/data; CI job `docker-build` (build เท่านั้น) · `pyproject.toml` มีแล้วจาก G1
 
