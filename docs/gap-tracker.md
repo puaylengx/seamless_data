@@ -9,11 +9,11 @@
 | Phase | เสร็จ | กำลังทำ | ยังไม่เริ่ม | blocked บางส่วน |
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
-| Phase 1 | 3/5 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10) | G16 (PR #11) | 1 (G6) | G4 SoT (PD-4), G7 grants (PD-5) |
+| Phase 1 | 4/5 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 1 (G6) | G4 SoT (PD-4), G7 grants (PD-5) |
 | Phase 2 | 0/8 | — | 8 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8) |
-| Phase 3 | 1/6 (G20 ✅ PR #6) | — | 5 | G8 (PD-6), G12 (PD-6) |
+| Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-17 (G16 → PR #11)_
+_อัปเดตล่าสุด: 2026-09-18 (G16 merged; เพิ่ม G22)_
 
 ---
 
@@ -29,7 +29,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G16 → PR #11)_
 - [x] **G1** 🔴 · Testing, CI/CD · [QA + DevOps] [PR #6](https://github.com/puaylengx/seamless_data/pull/6) merged `99f8759` — `pyproject.toml` + `requirements-dev.txt` + GitHub Actions (ruff + pytest ทุก PR) `59085e6`; publication tests 36 cases (74 → 110 passed). zeal_data tests อยู่บน branch ตระกูล zeal (loader: PR #2, extractor: ตามมา)
 - [x] **G4** 🟠 · Data layering · [Pipeline + QA] [PR #9](https://github.com/puaylengx/seamless_data/pull/9) merged — `prepare_for_load()` ตัวเดียวสำหรับ MSSQL/BQ (track_evaluation), `src/research/reconcile.py` (rows/distinct key ต่อปี, prepared vs ปลายทาง, MSSQL ⇄ BQ) เรียกหลังทุก upload ทั้งสอง pipeline; +22 tests (110 → 132) · 🔒 ประกาศ source of truth รอ PD-4 — reconcile จึงแค่ WARNING ไม่ raise
 - [x] **G7** 🟠 · Security (Least Privilege) · [Security] [PR #10](https://github.com/puaylengx/seamless_data/pull/10) merged `fe9c7a0` — finance ERP/master `replace` ใช้ `DELETE FROM` แทน `TRUNCATE` (DML อย่างเดียว, transaction เดียวกับ INSERT); [`docs/db-roles.md`](db-roles.md) role matrix `schema_owner` / `etl_writer` / `bi_reader` + query ตรวจสิทธิ์ PG/MSSQL/BQ + checklist; test ยืนยันไม่มี DDL ใน SQL ที่ loader ส่ง · 🔒 ตรวจ/ลด grant จริงรอ PD-5 (DBA) · ข้อยกเว้นที่รู้: zeal `replace` ยัง DROP+CREATE (ต้องรอ G6/G11)
-- [~] **G16** 🟡 · Security · [Security] PR #11 รอ review — gitleaks สแกน history ทั้ง repo (76 commits) = 0 leaks; `.pre-commit-config.yaml` (gitleaks, detect-private-key, ruff, large files) + gitleaks step ใน CI (fetch-depth 0); SA JSON ย้ายไป `~/.config/seamless_data/` (copy → sha256 → auth dry-run → ลบต้นฉบับ) + `.gitignore` เพิ่ม `configs/secrets/ .env.* *.pem *.key`; `helpers/connect_db/urls.py` `URL.create()` แทน f-string ทั้ง MSSQL/PG-ssh/PG-direct (10 tests) · zeal PG URL f-string ยังอยู่บน branch zeal → ใช้ `postgres_url()` ตอน merge
+- [x] **G16** 🟡 · Security · [Security] [PR #11](https://github.com/puaylengx/seamless_data/pull/11) merged `5cc92a4` — gitleaks สแกน history ทั้ง repo (76 commits) = 0 leaks; `.pre-commit-config.yaml` (gitleaks, detect-private-key, ruff, large files) + gitleaks step ใน CI (fetch-depth 0); SA JSON ย้ายไป `~/.config/seamless_data/` (copy → sha256 → auth dry-run → ลบต้นฉบับ) + `.gitignore` เพิ่ม `configs/secrets/ .env.* *.pem *.key`; `helpers/connect_db/urls.py` `URL.create()` แทน f-string ทั้ง MSSQL/PG-ssh/PG-direct (10 tests) · zeal PG URL f-string ยังอยู่บน branch zeal → ใช้ `postgres_url()` ตอน merge
 - [ ] **G6** 🟠 · Data modeling · [Architect] ✋ ตาราง `schema_migrations` + `--dry-run` ใน `migrations/migrate.py`; ย้าย BQ DDL / reverse-engineer MSSQL schema เข้า `migrations/research/`
 
 ## Phase 2 — architecture / modeling (Sprint 3–4)
@@ -50,6 +50,7 @@ _อัปเดตล่าสุด: 2026-09-17 (G16 → PR #11)_
 - [ ] **G17** 🟡 · Config management · [Pipeline] ✋ ลบ hardcoded infra fallback (`SSH_HOST`, `DB_NAME`), รวม connection เป็น `helpers/connect_db/{postgres,mssql,bigquery}.py`
 - [ ] **G18** 🟢 · Documentation · [PM + ทุกคน] ✋ README module map, `docs/decisions/` decision log (ย้ายตาราง "ตัดสินภายในทีมแล้ว" จาก pending-decisions มา), แทน `print()` ที่เหลือ ~30 จุด (ค้างจาก G9)
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
+- [ ] **G22** 🟢 · Security / CI · [DevOps] ✋ CI gitleaks (gitleaks-action บน pull_request) สแกนเฉพาะ commit ของ PR ไม่ใช่ full history — เพิ่ม scheduled workflow (เช่น weekly) รัน `gitleaks git --log-opts=--all` แยกจาก PR check (full-history scan ล่าสุดทำในเครื่อง 2026-09-17 = 0 leaks, PR #11)
 - [x] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`
 
 ---
