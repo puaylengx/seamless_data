@@ -11,6 +11,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks สแกนทั้ง history ไม่ใช่แค่ HEAD
+
+      # ── secret scanning (G16): fail ถ้ามี credential ใน commit ไหนก็ตามของ PR ──
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:

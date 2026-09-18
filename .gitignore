@@ -1,7 +1,15 @@
 # ── Credentials ───────────────────────────────────────────────
+# นโยบาย (G16): ห้ามเก็บ credential ใน repo tree แม้จะ gitignore — เก็บที่ ~/.config/seamless_data/
+# gitleaks pre-commit hook (.pre-commit-config.yaml) เป็นชั้นป้องกันถ้ามีคน git add -f
 .env
+.env.*
+!.env.example
 *.json
 !*.example.json
+configs/secrets/
+*.pem
+*.key
+id_rsa*
 
 # ── Python ────────────────────────────────────────────────────
 __pycache__/

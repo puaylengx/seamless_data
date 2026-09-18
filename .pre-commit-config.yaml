@@ -1,0 +1,26 @@
+# ติดตั้งครั้งเดียวต่อเครื่อง:  pip install -r requirements-dev.txt && pre-commit install
+# รันเองทั้ง repo:              pre-commit run --all-files
+repos:
+  # ── secret scanning (G16) — บล็อก commit ที่มี credential/private key/token ──
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # ── lint เดียวกับ CI (G1) ──
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+
+  # ── กันไฟล์ credential/ขนาดใหญ่หลุดเข้า index ──
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: \.md$
