@@ -83,12 +83,16 @@ def test_load_to_mssql_goes_through_prepare_for_load(monkeypatch):
 
 
 def test_load_to_bigquery_refuses_without_service_account_key(monkeypatch, tmp_path):
+    # G17: ตรวจ config ก่อนสร้าง client — key ไม่พบ → MissingConfigError (เดิม FileNotFoundError) บอก path ที่หา
+    from helpers.connect_db.config import MissingConfigError
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(tmp_path / "missing.json"))
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setenv("GCP_DATASET_ID", "d")
     try:
         loader_mod.load_to_bigquery(_cleaned())
-        raise AssertionError("ควร raise FileNotFoundError")
-    except FileNotFoundError:
-        pass
+        raise AssertionError("ควร raise MissingConfigError")
+    except MissingConfigError as e:
+        assert "missing.json" in str(e) and "GOOGLE_APPLICATION_CREDENTIALS" in str(e)
 
 
 # ── summaries via fake engine / client ───────────────────────────────────────

@@ -21,7 +21,7 @@ _DB_COLUMNS = [
 ]
 
 TABLE  = "erp_2025"
-SCHEMA = "public"
+SCHEMA = os.getenv("DB_SCHEMA", "public")   # schema default ของ PostgreSQL — override ได้ผ่าน .env (G17)
 
 
 class ErpLoader:
