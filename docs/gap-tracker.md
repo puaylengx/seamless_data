@@ -10,10 +10,10 @@
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
 | Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
-| Phase 2 | 2/8 (G14 ✅ #14 · G15 ✅ #15) | G11 (PR #16) | 5 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8), G15 policy (PD-10) |
+| Phase 2 | 3/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16) | G5 (PR #17) | 4 | G5 erp key (PD-3) + status/dup (PD-11), G10 (Finance), G13 (Finance master file), G21 (PD-8), G15 policy (PD-10) |
 | Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
 
-_อัปเดตล่าสุด: 2026-09-18 (G15 merged; G11 → PR #16)_
+_อัปเดตล่าสุด: 2026-09-18 (G11 merged; G5 → PR #17)_
 
 ---
 
@@ -34,10 +34,10 @@ _อัปเดตล่าสุด: 2026-09-18 (G15 merged; G11 → PR #16)_
 
 ## Phase 2 — architecture / modeling (Sprint 3–4)
 
-- [ ] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] ✋ migration `003` PK บน `master_*` · 🔒 natural key ของ `erp_2025` รอ PD-3
+- [~] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] PR #17 รอ review — `migrations/finance/003_add_master_primary_keys.sql`: ลบ exact duplicate (เทียบทุก column, `ctid`) แล้ว `ADD PRIMARY KEY` ทุก master (key = `MasterValidator.KEY_COLUMNS`, test ยืนยันตรงกัน) ใน transaction เดียว · ตรวจไฟล์ master จริง: key ไม่ซ้ำทุกตาราง **ยกเว้น io_goods 76530045 ซ้ำ exact** + status domain ต่างกันต่อตาราง → 🔒 PD-11 · `apply` จริงต้องผ่าน `--dry-run` บน staging ก่อน (DevOps) · 🔒 natural key `erp_2025` รอ PD-3
 - [ ] **G10** 🟠 · Data modeling, layering · [Architect] align type `ic_strategy`/`mu_strategy` กับ master, `v_finance_*` view · 🔒 rename `erp_2025` → fact table รอ Finance ยืนยัน structure ข้ามปี
 - [ ] **G6** (ต่อ) · [Architect] BQ `track_evaluation` DDL ยังไม่มีใน repo (ไม่เคยมี) — ดึง schema จาก `client.get_table()` (metadata) ต้องขออนุญาตแยกเหมือน MSSQL · MSSQL 🔒 PD-9
-- [~] **G11** 🟡 · Data layering · [Pipeline + QA] PR #16 รอ review — publication: `extractor.py` (read_raw ตรวจ column บังคับ / read_reviewed_template), template assembly ย้ายจาก main → `transformer.build_publication_template`, **validator read-only** (month-fill ย้ายไป `coerce_and_clean` ตาม pattern G3; test G1 ที่ assert mutation เขียนใหม่ให้ตรวจผ่าน transformer) · track_evaluation: `extractor.py` · finance master: `MasterValidator` (key ว่าง/ซ้ำ/column หาย → fail, status แปลก → warning) เข้า main ก่อน load · **zeal_data ยังไม่แตะ** (module อยู่ branch zeal — ทำหลัง #2/#7 merge)
+- [x] **G11** 🟡 · Data layering · [Pipeline + QA] [PR #16](https://github.com/puaylengx/seamless_data/pull/16) merged `74a174c` — publication: `extractor.py` (read_raw ตรวจ column บังคับ / read_reviewed_template), template assembly ย้ายจาก main → `transformer.build_publication_template`, **validator read-only** (month-fill ย้ายไป `coerce_and_clean` ตาม pattern G3; test G1 ที่ assert mutation เขียนใหม่ให้ตรวจผ่าน transformer) · track_evaluation: `extractor.py` · finance master: `MasterValidator` (key ว่าง/ซ้ำ/column หาย → fail, status แปลก → warning) เข้า main ก่อน load · **zeal_data ยังไม่แตะ** (module อยู่ branch zeal — ทำหลัง #2/#7 merge)
 - [x] **G15** 🟡 · Data modeling · [Architect + QA] [PR #15](https://github.com/puaylengx/seamless_data/pull/15) merged `dd9d491` · 🔒 ตัดสิน fail/ยึด doc_date/ยึด Excel รอ PD-10 — `helpers/fiscal.py` (`FISCAL_YEAR_START_MONTH=10`, `fiscal_month` / `fiscal_year` / `fiscal_year_from_date`) ใช้ทั้ง finance `add_fiscal_month` และ research `get_clean_budget_year` — test พิสูจน์ผลเท่าสูตรเดิมทุกกรณีรวม NaN; `ErpValidator.validate_fiscal_year_vs_doc_date` cross-check `fiscal_year`/`fiscal_month` จาก Excel vs derive จาก `doc_date` → **WARNING + `result["warnings"]` ไม่ block** (เก็บสถิติก่อนตัดสิน fail-fast)
 - [ ] **G13** 🟡 · Data quality · [QA] ✋ referential check `gl_id`/`cost_ctr_id` กับ master ใน `ErpValidator`; timeliness (as-of) · 🔒 master file ใหม่รอฝ่ายการเงิน
 - [ ] **G21** 🟡 · Data quality · [QA + Domain Expert Research] Publication validator ไม่ตรวจ Year suffix (`"2023 (RC3)"` → `20233` เงียบๆ ผ่าน `get_clean_year`) และไม่ validate `rank` กับ `_VALID_RANKS` (`"Dr."` หลุดผ่าน) — พบระหว่างเขียน test ของ G1 ([PR #6](https://github.com/puaylengx/seamless_data/pull/6)) · 🔒 เกณฑ์ที่ถูกต้องรอ PD-8 · ✋ เพิ่ม range check ปี (เช่น 2000–2100) ทำได้เลย

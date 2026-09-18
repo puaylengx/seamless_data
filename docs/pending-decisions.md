@@ -16,6 +16,7 @@
 | PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-9 | MSSQL research DB จริงอยู่ที่ไหน (G6 ส่วน MSSQL DDL) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — **บล็อก G6 ส่วน MSSQL** | 2026-09-18 |
 | PD-10 | fiscal_year จาก Excel ≠ derive จาก doc_date — จะ fail / ยึด doc_date / ยึด Excel (G15) | Domain Expert — Finance (หลังมีสถิติจาก log 2–3 รอบ) | ⏳ รอข้อมูลจริงก่อน แล้วรอคำตอบ | 2026-09-18 |
+| PD-11 | นิยาม `status` ของ master แต่ละตาราง + แถวซ้ำ `io_good_id 76530045` (G5/G11) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
 
 ---
 
@@ -95,6 +96,17 @@
 - **ทำไมยังไม่ถาม/ยังไม่ทำ:** เป็น check ใหม่ ([PR #15](https://github.com/puaylengx/seamless_data/pull/15)) ยังไม่มีข้อมูลว่าไฟล์จริง mismatch บ่อยแค่ไหน → ตอนนี้ `ErpValidator` แค่ **WARNING** (`result["warnings"]`) ไม่ block เพื่อไม่ทำผิดซ้ำแบบ G3 ที่ fail-fast ก่อนรู้ scope
 - **ขั้นตอน:** รัน finance pipeline จริง 2–3 รอบ → รวมสถิติ mismatch (จำนวน/สัดส่วน/รูปแบบ เช่น กระจุกที่เดือนไหน) จาก log → นำไปถาม Finance พร้อมตัวเลข → ตัดสิน → เปลี่ยน validator ตามผล + decision log
 - **ผูกกับ:** G15 (tracker), G13 (DQ consistency), Metric Dictionary G12 (นิยามปีงบต้องอยู่ที่นั่นด้วย)
+
+## PD-11 · master data — นิยาม `status` ต่อตาราง และแถวซ้ำใน Master_IO_Goods (G5 / G11)
+
+- **ถามใคร:** Domain Expert — Finance
+- **พบจากไฟล์จริง (อ่าน Excel local 2026-09-18, ไม่แตะ DB):**
+  1. `status` ใช้คนละชุดต่อตาราง: `master_io_work` = `use` / `cancel`, `master_ic_strategy` / `master_mu_strategy` = `0` / `1`, ที่เหลือไม่มี column status (transformer เติม `active`) — ยังไม่มีนิยามว่าแต่ละค่าหมายถึงอะไร และ `MasterTransformer.add_status` เติม `active` ให้ช่องว่างแม้ในตารางที่ใช้ `use/cancel` (พฤติกรรมเดิม ยังไม่แก้)
+  2. `Master_IO_Goods_20230531.xlsx` แถว 46–47: `io_good_id 76530045` "เครื่องคอมพิวเตอร์สำนักงาน" ซ้ำ 2 แถวเหมือนกันทุก column
+  3. `Master_IO_Activity_20230531.xlsx` ไม่มีข้อมูล (0 แถว) — ตั้งใจหรือไฟล์ผิด?
+- **ถามอะไร:** (1) รายการค่า status ที่ถูกต้องและความหมายต่อตาราง + ควร normalize เป็นชุดเดียว (`active/inactive`) ไหม (2) แถวซ้ำ 76530045 ลบทิ้ง 1 แถวได้ไหม (migration 003 ลบ **เฉพาะ exact duplicate** ให้อัตโนมัติ ถ้า Finance ยืนยันว่าเป็นความผิดพลาดของไฟล์) (3) io_activities ว่างจริงไหม
+- **ทำไมต้องถาม:** `MasterValidator` เตือน status นอกชุดที่พบ (ไม่ block) และ **fail** เมื่อ key ซ้ำ → ไฟล์ io_goods ปัจจุบันจะโหลดไม่ผ่านจนกว่าจะแก้; PK ใน migration 003 ([PR #17](https://github.com/puaylengx/seamless_data/pull/17)) จะ rollback ถ้า DB มีแถวซ้ำที่ column อื่นต่างกัน
+- **ผลเมื่อได้คำตอบ:** ปรับ `VALID_STATUS_BY_TABLE` (หรือ normalize ใน transformer) + decision log; ให้ Finance ส่งไฟล์ io_goods ที่แก้แล้ว
 
 ---
 
