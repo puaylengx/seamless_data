@@ -2,6 +2,34 @@
 
 Data pipeline (Finance / Research / Zeal Data) → PostgreSQL / MSSQL / BigQuery → dashboard
 
+## Quick start
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env            # กรอกค่าให้ครบ — ขาดตัวไหน pipeline จะบอกชื่อ env var ตอนรัน (ไม่มี default เป็นที่อยู่ infra)
+.venv/bin/pre-commit install     # gitleaks + ruff ก่อน commit (macOS: ดู SSL_CERT_FILE ด้านล่าง)
+.venv/bin/python -m pytest tests -q          # unit tests (ไม่ต่อ DB)
+python migrations/migrate.py --status        # ดู migration ที่ apply แล้ว (PostgreSQL)
+```
+
+## Module map
+
+| path | หน้าที่ | รันอย่างไร |
+|---|---|---|
+| `src/finance/` | ERP 2025 (Excel → PostgreSQL `erp_2025`): `extractor` → `transformer` → `validator` (+ referential/timeliness/fiscal cross-check) → `loader` | `python src/finance/main.py [append\|replace]` |
+| `src/finance/master/` | master tables 9 ตาราง + `MasterValidator` (key ว่าง/ซ้ำ → fail) | `python src/finance/master/main.py [table\|all] [replace\|append]` (replace ต้อง `ALLOW_REPLACE=true`) |
+| `src/finance/reference.py` | reference sets จากไฟล์ master สำหรับ consistency check | ใช้โดย finance main |
+| `src/research/publication/` | ผลงานตีพิมพ์: raw → draft template (review) → MSSQL + BigQuery (MERGE) + reconcile | `python src/research/publication/main.py <template\|pipeline\|export\|upload\|upload_bq> <xlsx>` |
+| `src/research/track_evaluation/` | ประเมินผลงาน: เหมือน publication; `coerce_and_clean` เป็นจุดเดียวของ transformation | `python src/research/track_evaluation/main.py <...>` |
+| `src/research/reconcile.py` | เทียบ batch ที่เขียน vs ปลายทาง และ MSSQL ⇄ BigQuery ต่อปี (WARNING ไม่ raise) | เรียกอัตโนมัติหลัง upload |
+| `helpers/connect_db/` | `config.py` (ตรวจ env ครบก่อนต่อ), `connection.py` (PostgreSQL ssh/direct), `mssql.py`, `bigquery.py`, `urls.py` (`URL.create`) | — |
+| `helpers/replace_guard.py`, `helpers/fiscal.py`, `helpers/logger.py` | ALLOW_REPLACE guard · นิยามปีงบ (เริ่ม ต.ค.) · logger กลาง (`src` + main) | — |
+| `migrations/` | `finance/` (PostgreSQL, `migrate.py` + `schema_migrations`), `research/bigquery/`, `research/mssql/` | ดู `migrations/README.md` |
+| `tests/` | unit tests ทั้งหมด synthetic data ไม่ต่อ DB; `test_connection.py` = integration (`-m integration`) | CI ทุก PR |
+| `docs/` | `gap-tracker.md` (สถานะ G1–G22), `pending-decisions.md` (รอนอกทีม), `decisions/` (ตัดสินแล้ว), `db-roles.md`, `finance-questions-*.md` | — |
+
+**Logs:** `logs/<domain>/*.log` — ทุก run ปิดท้ายด้วยบรรทัด `JOB SUMMARY job=… status=… duration=… rows_in=… rows_out=…` (grep ได้สำหรับ monitoring); upload flag ทุกตัว default `false`
+
 - ทีมเสมือน กติกา และมาตรฐานที่ยึดถือ: [docs/team-project-instructions.md](docs/team-project-instructions.md)
 - Gap analysis + roadmap: [docs/gap-analysis-2026-09.md](docs/gap-analysis-2026-09.md)
 - เรื่องที่รอคำตอบจากนอกทีม: [docs/pending-decisions.md](docs/pending-decisions.md)
