@@ -58,6 +58,19 @@ def test_unknown_status_is_warning_not_error():
     print("✅ status แปลก → warning เท่านั้น")
 
 
+def test_status_domain_matches_real_master_files():
+    # ค่าที่พบจริง (G5 ตรวจไฟล์ 2026-09-18): io_work ใช้ use/cancel, strategies ใช้ 0/1 — ต้องไม่เตือน
+    from src.finance.master.validator import valid_status
+    work = pd.DataFrame({"io_work_id": ["W1", "W2"], "io_work_description": ["a", "b"], "status": ["use", "cancel"]})
+    assert MasterValidator(work, "master_io_work").run()["warnings"] == []
+    strat = pd.DataFrame({"ic_strategy_id": ["S1"], "start_year": [2020], "end_year": [2024], "name_en": ["x"],
+                          "ic_strategy_description": ["d"], "status": ["1"]})
+    assert MasterValidator(strat, "master_ic_strategy").run()["warnings"] == []
+    assert valid_status("master_fund") == {"active", "inactive"}
+    assert MasterValidator(_fund(status=["use", "active"]), "master_fund").run()["warnings"] != []
+    print("✅ status domain ต่อตารางตรงข้อมูลจริง")
+
+
 def test_validator_does_not_mutate():
     df = _fund(fund_id=["F1", "F1"], status=["x", None])
     snap = df.copy(deep=True)

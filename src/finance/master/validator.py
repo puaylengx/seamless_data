@@ -15,7 +15,18 @@ KEY_COLUMNS: dict[str, str] = {table: cols[0] for table, cols in _TABLE_COLUMNS.
 # master_gl มี key ผสม (group_id + gl_id): gl_id คือตัวที่ต้องไม่ซ้ำ
 KEY_COLUMNS["master_gl"] = "gl_id"
 
-VALID_STATUS = {"active", "inactive"}
+# ค่า status ที่พบจริงในไฟล์ master (2023-05-31 / 2024-06-05) — แต่ละตารางใช้คนละชุด และยังไม่มีนิยามจากฝ่ายการเงิน (PD-11)
+# ค่าไหนไม่อยู่ในชุด → warning เท่านั้น (ไม่ block) จนกว่า Finance จะยืนยัน domain
+_DEFAULT_STATUS = {"active", "inactive"}          # transformer.add_status เติม "active" ให้ไฟล์ที่ไม่มี column status
+VALID_STATUS_BY_TABLE: dict[str, set[str]] = {
+    "master_io_work": {"use", "cancel"},
+    "master_ic_strategy": {"0", "1"},
+    "master_mu_strategy": {"0", "1"},
+}
+
+
+def valid_status(table_name: str) -> set[str]:
+    return VALID_STATUS_BY_TABLE.get(table_name, set()) | _DEFAULT_STATUS
 
 
 class MasterValidator:
@@ -63,13 +74,14 @@ class MasterValidator:
         return self
 
     def validate_status(self) -> "MasterValidator":
-        """status นอก {active, inactive} → warning (ยังไม่มีนิยามจากฝ่ายการเงินว่ามีค่าอื่นได้ไหม)"""
+        """status นอกชุดที่พบจริงของตารางนั้น → warning (นิยาม domain รอ Finance — PD-11)"""
         if "status" not in self.df.columns:
             return self
-        bad = ~self.df["status"].astype(str).str.strip().str.lower().isin(VALID_STATUS)
+        allowed = valid_status(self.table_name)
+        bad = ~self.df["status"].astype(str).str.strip().str.lower().isin(allowed)
         if bad.any():
             self.warnings.append(
-                f"{self.table_name}: status นอก {sorted(VALID_STATUS)} {int(bad.sum())} แถว ที่ Excel rows: {self._rows(bad)[:10]}"
+                f"{self.table_name}: status นอก {sorted(allowed)} {int(bad.sum())} แถว ที่ Excel rows: {self._rows(bad)[:10]}"
             )
         return self
 

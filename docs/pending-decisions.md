@@ -16,6 +16,9 @@
 | PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-9 | MSSQL research DB จริงอยู่ที่ไหน (G6 ส่วน MSSQL DDL) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — **บล็อก G6 ส่วน MSSQL** | 2026-09-18 |
 | PD-10 | fiscal_year จาก Excel ≠ derive จาก doc_date — จะ fail / ยึด doc_date / ยึด Excel (G15) | Domain Expert — Finance (หลังมีสถิติจาก log 2–3 รอบ) | ⏳ รอข้อมูลจริงก่อน แล้วรอคำตอบ | 2026-09-18 |
+| PD-11a | master `status`: นิยาม/ค่าที่ถูกต้องต่อตาราง (G11) | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
+| PD-11b | `io_good_id 76530045` ซ้ำ 2 แถวเหมือนกัน — ลบ 1 แถวได้ไหม (G5, migration 004) | Domain Expert — Finance | ⏳ รอคำตอบ — **บล็อก 003 บน DB ที่มีแถวซ้ำ** | 2026-09-18 |
+| PD-11c | `Master_IO_Activity` ว่าง 0 แถว — ตั้งใจหรือไฟล์ผิด | Domain Expert — Finance | ⏳ รอคำตอบ | 2026-09-18 |
 
 ---
 
@@ -95,6 +98,27 @@
 - **ทำไมยังไม่ถาม/ยังไม่ทำ:** เป็น check ใหม่ ([PR #15](https://github.com/puaylengx/seamless_data/pull/15)) ยังไม่มีข้อมูลว่าไฟล์จริง mismatch บ่อยแค่ไหน → ตอนนี้ `ErpValidator` แค่ **WARNING** (`result["warnings"]`) ไม่ block เพื่อไม่ทำผิดซ้ำแบบ G3 ที่ fail-fast ก่อนรู้ scope
 - **ขั้นตอน:** รัน finance pipeline จริง 2–3 รอบ → รวมสถิติ mismatch (จำนวน/สัดส่วน/รูปแบบ เช่น กระจุกที่เดือนไหน) จาก log → นำไปถาม Finance พร้อมตัวเลข → ตัดสิน → เปลี่ยน validator ตามผล + decision log
 - **ผูกกับ:** G15 (tracker), G13 (DQ consistency), Metric Dictionary G12 (นิยามปีงบต้องอยู่ที่นั่นด้วย)
+
+## PD-11 · master data — 3 คำถามแยกกัน ตอบได้ทีละข้อ ไม่ต้องรอครบ (G5 / G11)
+
+พบจากไฟล์จริง (อ่าน Excel local 2026-09-18, ไม่แตะ DB) · ถามใคร: **Domain Expert — Finance** ทั้ง 3 ข้อ
+
+### PD-11a · นิยาม `status` ต่อตาราง
+- **พบ:** `master_io_work` = `use` / `cancel` · `master_ic_strategy`, `master_mu_strategy` = `0` / `1` · ตารางอื่นไม่มี column status (transformer เติม `active`) — และ `MasterTransformer.add_status` เติม `active` ให้ช่องว่างแม้ในตารางที่ใช้ `use/cancel` (พฤติกรรมเดิม ยังไม่แก้)
+- **ถาม:** แต่ละค่าหมายถึงอะไร (`1` = ใช้งานอยู่?), ควร normalize เป็นชุดเดียว (`active/inactive`) ไหม, ช่องว่างควรเป็นอะไร
+- **ตอนนี้:** `MasterValidator` เตือน (ไม่ block) เมื่อ status นอกชุดที่พบจริงต่อตาราง (`VALID_STATUS_BY_TABLE`)
+- **เมื่อตอบ:** ปรับ validator/transformer + decision log
+
+### PD-11b · แถวซ้ำ `io_good_id 76530045` — ลบได้ไหม
+- **พบ:** `Master_IO_Goods_20230531.xlsx` แถว 46–47 "เครื่องคอมพิวเตอร์สำนักงาน" ซ้ำ 2 แถว **เหมือนกันทุก column**
+- **ถาม:** ลบเหลือ 1 แถวได้ไหม (เป็นความผิดพลาดของไฟล์ ไม่ใช่ 2 รายการจริง?)
+- **ตอนนี้:** `MasterValidator` **fail** ไฟล์นี้ (key ซ้ำ) → โหลดใหม่ไม่ผ่านจนกว่าจะแก้ไฟล์ · migration **003** (ADD PRIMARY KEY อย่างเดียว) จะ **fail + rollback** บน DB ที่ยังมีแถวซ้ำ — พิสูจน์แล้วบน PostgreSQL 16 ชั่วคราว 2026-09-18 ([PR #17](https://github.com/puaylengx/seamless_data/pull/17)) · migration **004** (`-- migrate: manual`, ลบเฉพาะแถวเหมือนกันเป๊ะ) เตรียมไว้ **ห้าม apply จนกว่าข้อนี้ตอบ**
+- **เมื่อตอบ "ลบได้":** กรอกผู้ยืนยัน/วันที่ในหัวไฟล์ 004 → `migrate.py --only finance/004_dedupe_io_goods --dry-run` บน staging → apply → แล้วรัน 003 ตามปกติ · ขอไฟล์ io_goods ที่แก้แล้วจาก Finance ด้วย
+
+### PD-11c · `Master_IO_Activity_20230531.xlsx` ไม่มีข้อมูล
+- **พบ:** 0 แถวหลัง dropna → ตาราง `master_io_activities` ว่าง
+- **ถาม:** ตั้งใจ (ยังไม่มี activity) หรือไฟล์ผิด/ตกหล่น
+- **ตอนนี้:** ไม่กระทบ 003 (PK บนตารางว่างได้)
 
 ---
 

@@ -6,6 +6,10 @@
   python migrations/migrate.py finance         # เฉพาะ section
   python migrations/migrate.py --dry-run       # รันจริงใน transaction แล้ว ROLLBACK — ไม่เปลี่ยน DB
   python migrations/migrate.py --status        # แสดงว่าไฟล์ไหน applied/pending ไม่แตะ DB นอกจากอ่าน schema_migrations
+  python migrations/migrate.py --only finance/004_dedupe_io_goods [--dry-run]
+                                               # apply ไฟล์เดียวแบบระบุชื่อ — ทางเดียวที่ไฟล์ "-- migrate: manual" จะถูกรัน
+
+ไฟล์ที่มีบรรทัด "-- migrate: manual" (เช่น การลบข้อมูลที่ต้องรอคนยืนยัน) จะถูก **ข้าม** ในการรันปกติเสมอ
 
 กติกา (team-project-instructions ข้อ 5 / Data Architect):
   - ทุก schema change = ไฟล์ migration ใหม่เท่านั้น ห้ามแก้ไฟล์ที่ apply แล้ว
@@ -58,11 +62,15 @@ logger = get_styled_logger(
 )
 
 
+MANUAL_MARKER = "-- migrate: manual"
+
+
 @dataclass(frozen=True)
 class Migration:
     id: str          # finance/001_create_erp_2025
     path: Path
     checksum: str
+    manual: bool = False   # มี MANUAL_MARKER → ไม่รันอัตโนมัติ ต้อง --only
 
     @property
     def sql(self) -> str:
@@ -93,7 +101,8 @@ def discover(section: str = "all", root: Path = MIGRATIONS_DIR) -> list[Migratio
         if not folder.is_dir():
             raise MigrationError(f"ไม่พบ folder: {folder}")
         for f in sorted(folder.glob("*.sql")):
-            found.append(Migration(id=f"{sec}/{f.stem}", path=f, checksum=_checksum(f)))
+            manual = MANUAL_MARKER in f.read_text(encoding="utf-8")
+            found.append(Migration(id=f"{sec}/{f.stem}", path=f, checksum=_checksum(f), manual=manual))
     return found
 
 
@@ -106,8 +115,16 @@ def applied_migrations(cur) -> dict[str, str]:
     return {row[0]: row[1] for row in cur.fetchall()}
 
 
-def plan(migrations: list[Migration], applied: dict[str, str]) -> list[Migration]:
-    """คืนเฉพาะที่ยังไม่ apply; raise ถ้าไฟล์ที่ apply แล้วถูกแก้ (ห้ามแก้ migration เก่า)"""
+def plan(migrations: list[Migration], applied: dict[str, str], only: str | None = None) -> list[Migration]:
+    """
+    คืนเฉพาะที่ยังไม่ apply; raise ถ้าไฟล์ที่ apply แล้วถูกแก้ (ห้ามแก้ migration เก่า)
+    ไฟล์ manual ถูกข้าม (log ไว้) เว้นแต่ระบุ only=<id> ซึ่งจะคืนไฟล์นั้นไฟล์เดียว
+    """
+    if only is not None:
+        match = [m for m in migrations if m.id == only]
+        if not match:
+            raise MigrationError(f"--only: ไม่พบ migration '{only}' (มี: {[m.id for m in migrations]})")
+        migrations = match
     pending = []
     for m in migrations:
         if m.id in applied:
@@ -117,13 +134,16 @@ def plan(migrations: list[Migration], applied: dict[str, str]) -> list[Migration
                     "ห้ามแก้ migration ที่รันเข้า DB แล้ว ให้สร้างไฟล์ใหม่แทน"
                 )
             continue
+        if m.manual and only is None:
+            logger.warning("  ⏭  %s มี '%s' — ข้าม (apply ด้วย --only %s เมื่อได้รับอนุญาต)", m.id, MANUAL_MARKER, m.id)
+            continue
         pending.append(m)
     return pending
 
 
 # ── apply ─────────────────────────────────────────────────────────────────────
 
-def apply(conn, migrations: list[Migration], *, dry_run: bool, applied_by: str | None) -> list[Migration]:
+def apply(conn, migrations: list[Migration], *, dry_run: bool, applied_by: str | None, only: str | None = None) -> list[Migration]:
     """
     รัน migration ที่ pending ทั้งหมดใน transaction เดียว
     dry_run=True → รันทุกไฟล์จริง (จับ syntax/dependency error ได้) แล้ว ROLLBACK ไม่ COMMIT
@@ -133,7 +153,7 @@ def apply(conn, migrations: list[Migration], *, dry_run: bool, applied_by: str |
     try:
         with conn.cursor() as cur:
             applied = applied_migrations(cur)
-            pending = plan(migrations, applied)
+            pending = plan(migrations, applied, only=only)
             logger.info("applied แล้ว %d · pending %d%s", len(applied), len(pending), " (DRY RUN)" if dry_run else "")
             for m in pending:
                 logger.info("  ▶ %s", m.id)
@@ -162,7 +182,7 @@ def status(conn, migrations: list[Migration]) -> None:
     conn.rollback()  # CREATE TABLE IF NOT EXISTS ของ tracking ไม่ต้องคงไว้ในโหมด status
     for m in migrations:
         if m.id not in applied:
-            mark = "pending"
+            mark = "pending (MANUAL — ต้อง --only)" if m.manual else "pending"
         elif applied[m.id] == m.checksum:
             mark = "applied"
         else:
@@ -186,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("section", nargs="?", default="all", help=f"หนึ่งใน {PG_SECTIONS} หรือ all")
     parser.add_argument("--dry-run", action="store_true", help="รันใน transaction แล้ว rollback")
     parser.add_argument("--status", action="store_true", help="แสดง applied/pending เท่านั้น")
+    parser.add_argument("--only", metavar="ID", help="apply เฉพาะ migration นี้ (เช่น finance/004_dedupe_io_goods) — ทางเดียวสำหรับไฟล์ manual")
     args = parser.parse_args(argv)
 
     try:
@@ -201,10 +222,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.status:
             status(conn, migrations)
         else:
-            apply(conn, migrations, dry_run=args.dry_run, applied_by=os.getenv("CREATED_BY"))
+            apply(conn, migrations, dry_run=args.dry_run, applied_by=os.getenv("CREATED_BY"), only=args.only)
         return 0
     except MigrationError as e:
         logger.error("❌ %s", e)
+        return 1
+    except Exception as e:  # DB error (เช่น UniqueViolation) — apply() log + rollback ไปแล้ว แค่คืน exit code
+        logger.error("❌ หยุดเพราะ: %s", str(e).splitlines()[0])
         return 1
     finally:
         close_connection(conn, tunnel)

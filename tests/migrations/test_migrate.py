@@ -14,6 +14,7 @@ from migrations.migrate import (
     PG_SECTIONS,
     TRACKING_TABLE,
     Migration,
+    MANUAL_MARKER,
     MigrationError,
     apply,
     discover,
@@ -152,6 +153,42 @@ def test_apply_refuses_when_applied_file_changed(repo):
     with pytest.raises(MigrationError):
         apply(conn, discover("all", root=repo), dry_run=False, applied_by=None)
     assert conn.rolled_back
+
+
+# ── manual marker (G5: 004_dedupe_io_goods) ───────────────────────────────────
+
+def test_manual_migration_is_skipped_unless_only(repo, caplog):
+    import logging
+    (repo / "finance" / "003_manual.sql").write_text(f"-- x\n{MANUAL_MARKER}\nDELETE FROM a;", encoding="utf-8")
+    ms = discover("all", root=repo)
+    assert [m.manual for m in ms] == [False, False, True]
+    with caplog.at_level(logging.WARNING, logger="migrations.migrate"):
+        pending = plan(ms, {})
+    assert [m.id for m in pending] == ["finance/001_a", "finance/002_b"]     # manual ไม่อยู่ใน pending
+    assert "--only finance/003_manual" in caplog.text
+    only = plan(ms, {}, only="finance/003_manual")
+    assert [m.id for m in only] == ["finance/003_manual"]
+    print("✅ manual: ข้ามในรันปกติ, apply ได้เฉพาะ --only")
+
+
+def test_only_unknown_id_raises(repo):
+    with pytest.raises(MigrationError, match="--only"):
+        plan(discover("all", root=repo), {}, only="finance/999_nope")
+
+
+def test_apply_with_only_runs_that_file_alone(repo):
+    (repo / "finance" / "003_manual.sql").write_text(f"{MANUAL_MARKER}\nDELETE FROM a;", encoding="utf-8")
+    conn = _Conn()
+    done = apply(conn, discover("all", root=repo), dry_run=False, applied_by="t", only="finance/003_manual")
+    assert [m.id for m in done] == ["finance/003_manual"]
+    assert any("DELETE FROM a;" in s for s, _ in conn.sql)
+    assert not any(s.startswith("CREATE TABLE a") for s, _ in conn.sql)
+
+
+def test_real_repo_004_is_manual_and_003_is_not():
+    by_id = {m.id: m for m in discover("finance")}
+    assert by_id["finance/004_dedupe_io_goods"].manual is True
+    assert by_id["finance/003_add_master_primary_keys"].manual is False
 
 
 # ── status ────────────────────────────────────────────────────────────────────
