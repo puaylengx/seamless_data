@@ -48,17 +48,36 @@ def test_null_required_text_fails():
 
 # ── month ─────────────────────────────────────────────────────────────────────
 
-def test_invalid_month_is_recovered_from_effective_date():
-    # behavior ปัจจุบัน: เดือนผิด แต่มี effective_date → เติมจากวันที่แล้วผ่าน (และ mutate df)
+def test_invalid_month_is_recovered_by_transformer_then_validator_passes():
+    # G11: การเติม month จาก effective_date ย้ายไป transformer.coerce_and_clean — validator แค่ตรวจ
+    from src.research.publication.transformer import coerce_and_clean
+    raw = _row(publication_month=13, effective_date="2024-03-31")
+    cleaned = coerce_and_clean(raw)
+    assert cleaned["publication_month"].iloc[0] == 3
+    assert validate_publication(cleaned) is True
+    assert raw["publication_month"].iloc[0] == 13            # transformer ก็ไม่แก้ input
+    print("✅ month 13 + effective_date → transformer เติมเป็น 3 → validator ผ่าน")
+
+
+def test_validator_alone_rejects_invalid_month_and_does_not_recover():
     df = _row(publication_month=13, effective_date="2024-03-31")
-    assert validate_publication(df) is True
-    assert df["publication_month"].iloc[0] == 3
-    print("✅ month 13 + effective_date → เติมเป็น 3 แล้วผ่าน (behavior เดิม)")
+    assert validate_publication(df) is False                  # ไม่มีการเติมใน validator อีกแล้ว
+    assert df["publication_month"].iloc[0] == 13
+
+
+def test_validator_does_not_mutate_input():
+    df = _row(publication_month=13, effective_date="2024-03-31", publication_year="2024")
+    snap = df.copy(deep=True)
+    validate_publication(df)
+    pd.testing.assert_frame_equal(df, snap)
+    assert df["effective_date"].iloc[0] == "2024-03-31"      # ไม่ถูก coerce เป็น datetime
+    print("✅ validator read-only")
 
 
 def test_invalid_month_without_effective_date_fails():
-    assert validate_publication(_row(publication_month=None, effective_date=None)) is False
-    assert validate_publication(_row(publication_month=0, effective_date=None)) is False
+    from src.research.publication.transformer import coerce_and_clean
+    assert validate_publication(coerce_and_clean(_row(publication_month=None, effective_date=None))) is False
+    assert validate_publication(coerce_and_clean(_row(publication_month=0, effective_date=None))) is False
 
 
 # ── years ─────────────────────────────────────────────────────────────────────

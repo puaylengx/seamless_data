@@ -16,17 +16,8 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from helpers.logger import get_styled_logger
-from src.research.publication.transformer import (
-    get_parse_database_data,
-    get_rank,
-    get_group_rank,
-    get_clean_budget_year,
-    get_clean_publication_month,
-    get_clean_year,
-    get_format_effective_date,
-    get_national_international,
-    get_extract_sdg_values,
-)
+from src.research.publication.extractor import read_raw, read_reviewed_template
+from src.research.publication.transformer import build_publication_template, coerce_and_clean
 from src.research.publication.validator import validate_publication
 from src.research.publication.loader import (
     MERGE_KEYS,
@@ -57,98 +48,33 @@ logger = get_styled_logger(
     log_level=logging.INFO,
 )
 
-_DB_KEYS = [
-    "WoS_with_JIF-P90", "WoS_with_JIF", "WoS_SC", "WoS_SS", "WoS_AH", "WoS_ES",
-    "Scopus_SJR-10", "Scopus_Q1", "Scopus_Q2", "Scopus_Q3", "Scopus_Q4", "Scopus_No_Q",
-    "SENSE_ABC", "ERIC", "MathSciNet", "Pubmed", "JSTOR", "Project_Muse",
-    "Other_Inter.Databases", "TCI_Group1", "TCI_Group2", "National_Journal", "Field",
-]
-
-_COLUMN_ORDER = [
-    "rank", "group_rank", "description",
-    "Database (WoS, Scopus, TCI)",
-    "wos_with_jif_p90", "wos_with_jif", "wos_sc", "wos_ss", "wos_ah", "wos_es",
-    "scopus_sjr_10", "scopus_q1", "scopus_q2", "scopus_q3", "scopus_q4", "scopus_no_q",
-    "sense_abc", "eric", "math_sci_net", "pubmed", "jstor", "project_muse",
-    "other_inter", "tci_group1", "tci_group2", "national_journal", "field",
-    "division", "product_code", "firstname", "lastname", "title", "source",
-    "volume", "issue", "pages",
-    "publication_month", "publication_year", "publication_calendar_year",
-    "publication_budget_year", "effective_date", "national_international",
-] + [f"sdg{i}" for i in range(1, 18)]
-
-
-def _process_database(raw_data: pd.DataFrame) -> pd.DataFrame:
-    parsed_db = get_parse_database_data(raw_data.copy())
-    logger.info("Parsed Database (WoS, Scopus, TCI) column")
-
-    df = pd.DataFrame()
-    df["Database (WoS, Scopus, TCI)"] = raw_data["Database (WoS, Scopus, TCI)"]
-    for k in _DB_KEYS:
-        df[k] = parsed_db.get(k, None)
-
-    return df
-
-
-def _process_clean(raw_data: pd.DataFrame) -> pd.DataFrame:
-    df = pd.DataFrame()
-    df["rank"] = get_rank(raw_data)
-    df["group_rank"] = get_group_rank(raw_data)
-    df["publication_month"] = get_clean_publication_month(raw_data)
-    df["publication_year"] = get_clean_year(raw_data)
-    df["publication_calendar_year"] = get_clean_year(raw_data)
-    df["publication_budget_year"] = get_clean_budget_year(raw_data)
-    df["effective_date"] = get_format_effective_date(raw_data)
-    df["national_international"] = get_national_international(raw_data)
-
-    sdg_df = raw_data["SDGs Goal"].apply(
-        lambda x: pd.Series(get_extract_sdg_values(x) if pd.notna(x) else {})
-    )
-    return pd.concat([df, sdg_df], axis=1)
-
-
 def run_template(input_path: str) -> Path:
+    """extract (raw) → transform (draft template) → เขียนไฟล์ให้ฝ่ายวิจัย review — ไม่แตะ DB"""
     logger.info("=" * 20 + " Start template " + "=" * 20)
     logger.info("Input: %s", input_path)
 
-    raw_data = pd.read_excel(input_path, engine="openpyxl")
-    logger.info("Read %d rows from source file", len(raw_data))
-
-    db_data = _process_database(raw_data)
-    clean_data = _process_clean(raw_data)
-
-    template = pd.DataFrame({
-        "description": raw_data["Description"],
-        "division": raw_data["Division"],
-        "product_code": raw_data["Product Code"],
-        "firstname": raw_data["Firstname"],
-        "lastname": raw_data["Lastname"],
-        "title": raw_data["Title"],
-        "source": raw_data["Journal/Conference/Source"],
-        "volume": raw_data["Volume"] if "Volume" in raw_data.columns else None,
-        "issue": raw_data["Issue"] if "Issue" in raw_data.columns else None,
-        "pages": raw_data["Pages"] if "Pages" in raw_data.columns else None,
-    })
-
-    template = template.reset_index(drop=True)
-    db_data = db_data.reset_index(drop=True)
-    clean_data = clean_data.reset_index(drop=True)
-
-    df_combined = pd.concat([template, db_data, clean_data], axis=1)
-    df_combined = df_combined.rename(columns=_RENAME_MAP)
-
-    for col in _COLUMN_ORDER:
-        if col not in df_combined.columns:
-            df_combined[col] = None
-    df_final = df_combined[_COLUMN_ORDER]
-
+    raw_data = read_raw(input_path)
+    df_final = build_publication_template(raw_data, rename_map=_RENAME_MAP)
     logger.info("Built template: %d rows × %d columns", len(df_final), len(df_final.columns))
 
     output_path = TEMPLATE_DIR / f"draft_publications_template_{datetime.today():%Y-%m-%d}.xlsx"
     df_final.to_excel(output_path, index=False)
     logger.info("✅ Exported draft template to %s", output_path)
-
     return output_path
+
+
+def _load_reviewed_template(input_path: str) -> pd.DataFrame:
+    """
+    extract (reviewed template) → coerce_and_clean → validate — ใช้ร่วมกันทุกคำสั่งที่ตามด้วย export/upload
+    validate ไม่ผ่าน → sys.exit(1) ไม่เขียนข้อมูลเข้าปลายทางใดๆ (pattern เดียวกับ track_evaluation)
+    """
+    df = read_reviewed_template(input_path)
+    df = coerce_and_clean(df)
+    if not validate_publication(df):
+        logger.error("❌ Validation failed. ยกเลิก")
+        sys.exit(1)
+    logger.info("✅ Validation passed")
+    return df
 
 
 def reconcile(df: pd.DataFrame, *, mssql: bool, bq: bool) -> bool:
@@ -183,12 +109,7 @@ def reconcile(df: pd.DataFrame, *, mssql: bool, bq: bool) -> bool:
 def run_upload(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → MSSQL " + "=" * 20)
     logger.info("Input: %s", input_path)
-    df = pd.read_excel(input_path, engine="openpyxl")
-    logger.info("Read %d rows", len(df))
-    if not validate_publication(df):
-        logger.error("❌ Validation failed. ยกเลิกการเขียนข้อมูลลงฐานข้อมูล")
-        sys.exit(1)
-    logger.info("✅ Validation passed")
+    df = _load_reviewed_template(input_path)
     load_to_mssql(df)
     reconcile(df, mssql=True, bq=False)
     logger.info("🏁 Upload MSSQL complete")
@@ -197,12 +118,7 @@ def run_upload(input_path: str) -> None:
 def run_upload_bq(input_path: str) -> None:
     logger.info("=" * 20 + " Start upload → BigQuery " + "=" * 20)
     logger.info("Input: %s", input_path)
-    df = pd.read_excel(input_path, engine="openpyxl")
-    logger.info("Read %d rows", len(df))
-    if not validate_publication(df):
-        logger.error("❌ Validation failed. ยกเลิกการ upload")
-        sys.exit(1)
-    logger.info("✅ Validation passed")
+    df = _load_reviewed_template(input_path)
     load_to_bigquery(df)
     reconcile(df, mssql=False, bq=True)
     logger.info("🏁 Upload BigQuery complete")
@@ -211,12 +127,7 @@ def run_upload_bq(input_path: str) -> None:
 def run_export(input_path: str) -> Path:
     logger.info("=" * 20 + " Start export → Excel " + "=" * 20)
     logger.info("Input: %s", input_path)
-    df = pd.read_excel(input_path, engine="openpyxl")
-    logger.info("Read %d rows", len(df))
-    if not validate_publication(df):
-        logger.error("❌ Validation failed. ยกเลิกการ export")
-        sys.exit(1)
-    logger.info("✅ Validation passed")
+    df = _load_reviewed_template(input_path)
     output_path = EXPORT_DIR / f"publications_export_{datetime.now():%Y-%m-%d_%H-%M-%S}.xlsx"
     result = export_to_excel(df, output_path)
     logger.info("🏁 Export complete: %s", result)
@@ -242,13 +153,7 @@ def run_pipeline(input_path: str) -> None:
     logger.info("  PUBLICATION_UPLOAD_BQ    = %s", upload_bq)
     logger.info("Input: %s", input_path)
 
-    df = pd.read_excel(input_path, engine="openpyxl")
-    logger.info("Read %d rows", len(df))
-
-    if not validate_publication(df):
-        logger.error("❌ Validation failed.")
-        sys.exit(1)
-    logger.info("✅ Validation passed")
+    df = _load_reviewed_template(input_path)
 
     # 1. Export Excel เสมอ
     output_path = EXPORT_DIR / f"publications_export_{datetime.now():%Y-%m-%d_%H-%M-%S}.xlsx"

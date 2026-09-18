@@ -23,6 +23,10 @@ _YEAR_COLS = ["publication_year", "publication_calendar_year", "publication_budg
 
 
 def validate_publication(df: pd.DataFrame) -> bool:
+    """
+    ตรวจ DataFrame หลัง transformer.coerce_and_clean() แล้ว — **อ่านอย่างเดียว ไม่แก้ df** (G11, pattern เดียวกับ G3)
+    การเติม publication_month จาก effective_date ย้ายไป transformer แล้ว; ที่นี่แค่ตรวจว่าค่าอยู่ใน 1–12
+    """
     ok = True
 
     for col in _NON_NULLABLE:
@@ -32,25 +36,16 @@ def validate_publication(df: pd.DataFrame) -> bool:
             logger.error("Column '%s' มีค่า null ที่ Excel rows: %s", col, rows)
             ok = False
 
-    mask_bad = df["publication_month"].isna() | ~df["publication_month"].between(1, 12)
+    month = pd.to_numeric(df["publication_month"], errors="coerce")
+    mask_bad = month.isna() | ~month.between(1, 12)
     if mask_bad.any():
         rows = (df.index[mask_bad] + _EXCEL_ROW_OFFSET).tolist()
-        logger.info(
-            "publication_month ไม่อยู่ใน 1–12 ที่ Excel rows: %s → ใช้ effective_date แทน", rows
-        )
-        df["effective_date"] = pd.to_datetime(df["effective_date"], errors="coerce")
-        fillable = mask_bad & df["effective_date"].notna()
-        df.loc[fillable, "publication_month"] = df.loc[fillable, "effective_date"].dt.month
-        still_bad = df["publication_month"].isna() | ~df["publication_month"].between(1, 12)
-        if still_bad.any():
-            rows2 = (df.index[still_bad] + _EXCEL_ROW_OFFSET).tolist()
-            logger.warning(
-                "ยังมี publication_month ที่ไม่ถูกต้อง %d แถว: %s", still_bad.sum(), rows2
-            )
-            ok = False
+        logger.warning("publication_month ไม่อยู่ใน 1–12 %d แถว ที่ Excel rows: %s", int(mask_bad.sum()), rows)
+        ok = False
 
     for col in _YEAR_COLS:
-        mask = df[col].isna() | (df[col].astype(float) <= 0)
+        year = pd.to_numeric(df[col], errors="coerce")
+        mask = year.isna() | (year <= 0)
         if mask.any():
             rows = (df.index[mask] + _EXCEL_ROW_OFFSET).tolist()
             logger.warning("Column '%s' ไม่ใช่ positive int ที่ Excel rows: %s", col, rows)

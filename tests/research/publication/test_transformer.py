@@ -10,8 +10,11 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from src.research.publication.transformer import (
+    TEMPLATE_COLUMN_ORDER,
     _CLASSIFICATION_COL,
     _parse_database_entry,
+    build_publication_template,
+    coerce_and_clean,
     get_clean_budget_year,
     get_clean_publication_month,
     get_clean_year,
@@ -180,6 +183,63 @@ def test_national_international_rules():
     })
     assert get_national_international(df).tolist() == ["International", "National", "International", "National-Good"]
     print("✅ classification ว่าง → ดูจาก DB flag; special → International; อื่นผ่านตามเดิม")
+
+
+# ── coerce_and_clean (G11) ────────────────────────────────────────────────────
+
+def test_coerce_fills_bad_month_from_effective_date_only_when_parseable():
+    df = pd.DataFrame({
+        "publication_month": [13, None, 5, 0],
+        "effective_date": ["2024-03-31", "2023-11-02", "2024-01-01", "garbage"],
+    })
+    out = coerce_and_clean(df)
+    assert out["publication_month"].tolist()[:3] == [3, 11, 5]
+    assert out["publication_month"].iloc[3] == 0              # เดือนผิด + วันที่ parse ไม่ได้ → คงค่าเดิม ให้ validator จับ (เหมือนเดิม)
+    assert out["effective_date"].tolist() == df["effective_date"].tolist()   # ไม่ coerce effective_date
+    print("✅ coerce_and_clean: เติม month จาก effective_date เฉพาะที่ parse ได้")
+
+
+def test_coerce_does_not_mutate_and_skips_when_columns_missing():
+    df = pd.DataFrame({"publication_month": [13], "effective_date": ["2024-03-31"]})
+    snap = df.copy(deep=True)
+    coerce_and_clean(df)
+    pd.testing.assert_frame_equal(df, snap)
+    assert coerce_and_clean(pd.DataFrame({"title": ["t"]})).equals(pd.DataFrame({"title": ["t"]}))
+
+
+# ── build_publication_template (G11: ย้ายจาก main) ───────────────────────────
+
+def _raw_row(**o):
+    d = {
+        "Description": "Journal", "Division": "Science", "Product Code": "P-1", "Firstname": "A",
+        "Lastname": "B", "Title": "T", "Journal/Conference/Source": "J", "Rank": "Asst.Prof",
+        "Year": "2024", "Month": "2024-11", "Online Date": None, "Publication Date": "2024-11-15",
+        DB_COL: "Scopus SJR-Q1, TCI Group 1, Field: Physics", "SDGs Goal": "3, 7",
+        _CLASSIFICATION_COL: None, "Volume": "12", "Issue": None, "Pages": "1-10",
+    }
+    d.update(o)
+    return pd.DataFrame([d])
+
+
+def test_build_template_columns_and_values():
+    from src.research.publication.loader import _RENAME_MAP
+    out = build_publication_template(_raw_row(), rename_map=_RENAME_MAP)
+    assert list(out.columns) == TEMPLATE_COLUMN_ORDER
+    r = out.iloc[0]
+    assert (r["rank"], r["group_rank"]) == ("Asst.Prof.", "Lecturer")
+    assert (r["scopus_q1"], r["tci_group1"], r["field"]) == (1, 1, "Physics")
+    assert (r["publication_month"], r["publication_year"], r["publication_budget_year"]) == (11, 2024, 2025)
+    assert r["effective_date"] == "2024-11-15" and r["national_international"] == "International"
+    assert (r["sdg3"], r["sdg7"], r["sdg1"]) == (1, 1, 0)
+    assert (r["volume"], r["pages"]) == ("12", "1-10") and pd.isna(r["issue"])
+    print("✅ build_publication_template: ลำดับ column + ค่าครบเหมือน main เดิม")
+
+
+def test_build_template_optional_columns_absent_become_none():
+    from src.research.publication.loader import _RENAME_MAP
+    raw = _raw_row().drop(columns=["Volume", "Issue", "Pages"])
+    out = build_publication_template(raw, rename_map=_RENAME_MAP)
+    assert out["volume"].isna().all() and "pages" in out.columns
 
 
 if __name__ == "__main__":
