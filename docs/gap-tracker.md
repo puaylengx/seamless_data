@@ -9,8 +9,8 @@
 | Phase | เสร็จ | กำลังทำ | ยังไม่เริ่ม | blocked บางส่วน |
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
-| Phase 1 | 4/5 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | G6 (PR #13, ส่วนที่ทำได้) | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
-| Phase 2 | 0/8 | — | 8 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8) |
+| Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
+| Phase 2 | 0/8 | G14 (PR #14) | 7 | G5 (PD-3), G10 (Finance), G13 (Finance master file), G21 (PD-8) |
 | Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
 
 _อัปเดตล่าสุด: 2026-09-18 (G6 → PR #13; PD-9)_
@@ -30,7 +30,7 @@ _อัปเดตล่าสุด: 2026-09-18 (G6 → PR #13; PD-9)_
 - [x] **G4** 🟠 · Data layering · [Pipeline + QA] [PR #9](https://github.com/puaylengx/seamless_data/pull/9) merged — `prepare_for_load()` ตัวเดียวสำหรับ MSSQL/BQ (track_evaluation), `src/research/reconcile.py` (rows/distinct key ต่อปี, prepared vs ปลายทาง, MSSQL ⇄ BQ) เรียกหลังทุก upload ทั้งสอง pipeline; +22 tests (110 → 132) · 🔒 ประกาศ source of truth รอ PD-4 — reconcile จึงแค่ WARNING ไม่ raise
 - [x] **G7** 🟠 · Security (Least Privilege) · [Security] [PR #10](https://github.com/puaylengx/seamless_data/pull/10) merged `fe9c7a0` — finance ERP/master `replace` ใช้ `DELETE FROM` แทน `TRUNCATE` (DML อย่างเดียว, transaction เดียวกับ INSERT); [`docs/db-roles.md`](db-roles.md) role matrix `schema_owner` / `etl_writer` / `bi_reader` + query ตรวจสิทธิ์ PG/MSSQL/BQ + checklist; test ยืนยันไม่มี DDL ใน SQL ที่ loader ส่ง · 🔒 ตรวจ/ลด grant จริงรอ PD-5 (DBA) · ข้อยกเว้นที่รู้: zeal `replace` ยัง DROP+CREATE (ต้องรอ G6/G11)
 - [x] **G16** 🟡 · Security · [Security] [PR #11](https://github.com/puaylengx/seamless_data/pull/11) merged `5cc92a4` — gitleaks สแกน history ทั้ง repo (76 commits) = 0 leaks; `.pre-commit-config.yaml` (gitleaks, detect-private-key, ruff, large files) + gitleaks step ใน CI (fetch-depth 0); SA JSON ย้ายไป `~/.config/seamless_data/` (copy → sha256 → auth dry-run → ลบต้นฉบับ) + `.gitignore` เพิ่ม `configs/secrets/ .env.* *.pem *.key`; `helpers/connect_db/urls.py` `URL.create()` แทน f-string ทั้ง MSSQL/PG-ssh/PG-direct (10 tests) · zeal PG URL f-string ยังอยู่บน branch zeal → ใช้ `postgres_url()` ตอน merge
-- [~] **G6** 🟠 · Data modeling · [Architect + DevOps] PR #13 รอ review — ✅ `schema_migrations` + `--dry-run`/`--status` + checksum guard ใน `migrate.py` (`078864f`, 11 tests) · ✅ BQ DDL/view ย้ายไป `migrations/research/bigquery/` + `migrations/README.md` (`7c2e0c8`) · 🔒 **MSSQL `001_*.sql` reverse-engineer รอ PD-9** (instance ที่ `.env` ชี้ไม่ได้รัน — query read-only เตรียมไว้แล้ว)
+- [~] **G6** 🟠 · Data modeling · [Architect + DevOps] [PR #13](https://github.com/puaylengx/seamless_data/pull/13) merged `0b3570a` — ✅ `schema_migrations` + `--dry-run`/`--status` + checksum guard ใน `migrate.py` (`078864f`, 11 tests) · ✅ BQ DDL/view ย้ายไป `migrations/research/bigquery/` + `migrations/README.md` (`7c2e0c8`) · 🔒 **MSSQL `001_*.sql` reverse-engineer รอ PD-9** (instance ที่ `.env` ชี้ไม่ได้รัน — query read-only เตรียมไว้แล้ว)
 
 ## Phase 2 — architecture / modeling (Sprint 3–4)
 
@@ -41,7 +41,7 @@ _อัปเดตล่าสุด: 2026-09-18 (G6 → PR #13; PD-9)_
 - [ ] **G15** 🟡 · Data modeling · [Architect] ✋ `helpers/fiscal.py` นิยาม fiscal year เดียว + validator cross-check `fiscal_year` vs `doc_date`
 - [ ] **G13** 🟡 · Data quality · [QA] ✋ referential check `gl_id`/`cost_ctr_id` กับ master ใน `ErpValidator`; timeliness (as-of) · 🔒 master file ใหม่รอฝ่ายการเงิน
 - [ ] **G21** 🟡 · Data quality · [QA + Domain Expert Research] Publication validator ไม่ตรวจ Year suffix (`"2023 (RC3)"` → `20233` เงียบๆ ผ่าน `get_clean_year`) และไม่ validate `rank` กับ `_VALID_RANKS` (`"Dr."` หลุดผ่าน) — พบระหว่างเขียน test ของ G1 ([PR #6](https://github.com/puaylengx/seamless_data/pull/6)) · 🔒 เกณฑ์ที่ถูกต้องรอ PD-8 · ✋ เพิ่ม range check ปี (เช่น 2000–2100) ทำได้เลย
-- [ ] **G14** 🟡 · CI/CD · [DevOps] ✋ pin versions, `pyproject.toml` (`pip install -e .`), Dockerfile (mdb-tools + ODBC 18)
+- [~] **G14** 🟡 · CI/CD · [DevOps] PR #14 รอ review — `requirements*.txt` pin `==` ทุกตัว (pandas 3.0.3, numpy 2.4.6, SQLAlchemy 2.0.50 …) ยืนยันใน fresh venv: 148 passed + `pip check` สะอาด; `Dockerfile` multi-stage (`runtime` ไม่มี dev deps/tests · `test` = runtime + dev + tests) python:3.12-slim + mdbtools + unixODBC + msodbcsql18, non-root, build-time assert ว่า ODBC 18 มีจริงและ pytest **ไม่** อยู่ใน runtime; `.dockerignore` กัน credential/data; CI job `docker-build` (build เท่านั้น) · `pyproject.toml` มีแล้วจาก G1
 
 ## Phase 3 — observability / documentation / dashboard readiness
 
