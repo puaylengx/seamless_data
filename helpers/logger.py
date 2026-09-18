@@ -79,7 +79,7 @@ def get_styled_logger(
     Logger พร้อมสีใน terminal (ใช้ colorlog) + บันทึกไฟล์แบบปกติ
     รองรับ level SUCCESS (25) เพิ่มเติม
 
-    handler ชุดเดียวกันจะถูกผูกไว้ 2 จุด:
+    handler ชุดเดียวกันจะถูกผูกไว้ 2 จุด (จุดที่สองเฉพาะเมื่อ name == "__main__"):
       - logger ชื่อ `name` (ปกติคือ "__main__" ของ pipeline ที่รัน)
       - logger ชื่อ SRC_LOGGER_NAME ("src") — เพื่อให้ submodule ที่ใช้
         logging.getLogger(__name__) เช่น "src.research.publication.validator"
@@ -115,11 +115,14 @@ def get_styled_logger(
 
     logger = logging.getLogger(name)
     targets = [logger]
-    if name != SRC_LOGGER_NAME:
+    # เฉพาะ entrypoint จริงของ process (รันเป็นสคริปต์ → name == "__main__") เท่านั้นที่เป็นเจ้าของ
+    # handler ของ "src" — module ที่ถูก *import* (name เช่น "src.finance.master.main") ได้ logger ของตัวเอง
+    # แต่ห้ามแย่ง "src" ไป ไม่งั้น log ของ validator/loader จะย้ายไปไฟล์ของ module ที่บังเอิญถูก import
+    # (เคยเกิดจริง: finance/main import master/main → erp run เขียนลง master_*.log — G18/PR #22)
+    if name == "__main__":
         targets.append(logging.getLogger(SRC_LOGGER_NAME))
 
-    # ถูกเรียกซ้ำ (เช่นใน test หรือรัน pipeline หลายตัวใน process เดียว)
-    # → handler ชุดล่าสุดแทนชุดเดิมทั้งสอง logger ไม่เขียนซ้ำ
+    # ถูกเรียกซ้ำจาก entrypoint เดิม (เช่นใน test) → handler ชุดล่าสุดแทนชุดเดิม ไม่เขียนซ้ำ
     for target in targets:
         target.setLevel(log_level)
         _close_handlers(target)

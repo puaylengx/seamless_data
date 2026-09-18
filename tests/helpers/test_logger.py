@@ -21,6 +21,13 @@ def _read(log_file: Path) -> str:
     return log_file.read_text(encoding="utf-8")
 
 
+def _read_file(log_file: Path) -> str:
+    for lg in logging.Logger.manager.loggerDict.values():
+        for h in getattr(lg, "handlers", []):
+            h.flush()
+    return log_file.read_text(encoding="utf-8")
+
+
 def _teardown(*names: str) -> None:
     """ปิด handler ที่ test เปิดไว้ ไม่ให้ค้างข้าม test / ค้างชี้ไฟล์ใน tmp dir ที่ถูกลบ"""
     for n in (*names, SRC_LOGGER_NAME):
@@ -81,6 +88,24 @@ def test_src_logger_does_not_propagate_to_root():
     print("✅ src logger ไม่ propagate ไป root")
 
 
+def test_imported_module_logger_does_not_hijack_src_handlers():
+    """G9 follow-up: entrypoint (__main__) เป็นเจ้าของ src; module ที่ถูก import ตั้ง logger ตัวเองได้แต่ห้ามแย่ง src"""
+    with tempfile.TemporaryDirectory() as tmp:
+        erp_log, master_log = Path(tmp) / "erp.log", Path(tmp) / "master.log"
+        get_styled_logger("__main__", Path(tmp), "erp.log", logging.INFO)          # entrypoint จริง
+        imported = get_styled_logger("src.finance.master.main", Path(tmp), "master.log", logging.INFO)  # ถูก import
+        try:
+            logging.getLogger("src.finance.validator").warning("from-validator")
+            imported.info("from-master-module")
+            assert "from-validator" in _read(erp_log)                               # ยังอยู่ไฟล์ของ entrypoint
+            assert "from-validator" not in master_log.read_text(encoding="utf-8")
+            assert "from-master-module" in master_log.read_text(encoding="utf-8")   # module มี log ของตัวเอง
+            assert "from-master-module" not in _read(erp_log)
+        finally:
+            _teardown("__main__", "src.finance.master.main")
+    print("✅ import module อื่นไม่ย้าย src handlers ออกจาก log ของ entrypoint")
+
+
 def test_name_under_src_does_not_double_write():
     """ถ้า name เป็นลูกของ src อยู่แล้ว (import เป็น module) ห้ามเขียน 2 รอบ"""
     with tempfile.TemporaryDirectory() as tmp:
@@ -88,10 +113,8 @@ def test_name_under_src_does_not_double_write():
         lg = get_styled_logger("src.research.publication.main", Path(tmp), "run.log", logging.INFO)
         try:
             lg.info("hello-from-child")
-            logging.getLogger("src.research.publication.validator").warning("hello-from-sibling")
-            content = _read(log_file)
+            content = _read_file(log_file)
             assert content.count("hello-from-child") == 1
-            assert content.count("hello-from-sibling") == 1
         finally:
             _teardown("src.research.publication.main")
     print("✅ name ใต้ src ไม่เขียนซ้ำ")
@@ -101,5 +124,6 @@ if __name__ == "__main__":
     test_src_submodule_warning_reaches_log_file()
     test_no_duplicate_lines_when_called_twice()
     test_src_logger_does_not_propagate_to_root()
+    test_imported_module_logger_does_not_hijack_src_handlers()
     test_name_under_src_does_not_double_write()
     print("\n🎉 ทุก test ผ่าน")
