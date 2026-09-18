@@ -88,6 +88,31 @@ def test_non_positive_or_missing_year_fails():
         assert validate_publication(_row(**{col: None})) is False, col
 
 
+def test_year_outside_plausible_range_fails(caplog):
+    """G21: '2023 (RC3)' → get_clean_year ให้ 20233 → ต้องไม่ผ่านอีกต่อไป (เดิมเช็คแค่ > 0)"""
+    import logging
+    with caplog.at_level(logging.WARNING, logger="src.research.publication.validator"):
+        assert validate_publication(_row(publication_year=20233)) is False
+    assert "2000–2100" in caplog.text and "20233" in caplog.text
+    assert validate_publication(_row(publication_budget_year=1999)) is False
+    assert validate_publication(_row(publication_calendar_year=2101)) is False
+    print("✅ ปีนอก 2000–2100 → fail พร้อมบอกค่าที่พบ")
+
+
+def test_year_boundaries_and_realistic_values_pass():
+    assert validate_publication(_row(publication_year=2000, publication_calendar_year=2000, publication_budget_year=2000)) is True
+    assert validate_publication(_row(publication_year=2100, publication_calendar_year=2100, publication_budget_year=2100)) is True
+    assert validate_publication(_row(publication_year=2017, publication_budget_year=2026)) is True
+
+
+def test_year_range_catches_get_clean_year_suffix_case_end_to_end():
+    # ต้นทางจริงของ G21: Year "2023 (RC3)" ผ่าน get_clean_year → 20233
+    from src.research.publication.transformer import get_clean_year
+    y = get_clean_year(pd.DataFrame({"Year": ["2023 (RC3)"]})).iloc[0]
+    assert y == 20233                                    # behavior เดิมของ transformer ยังไม่แก้ (PD-8)
+    assert validate_publication(_row(publication_year=int(y))) is False   # แต่ validator จับได้แล้ว
+
+
 # ── 0/1 flags ─────────────────────────────────────────────────────────────────
 
 def test_flag_columns_must_be_zero_or_one():
