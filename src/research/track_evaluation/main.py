@@ -17,7 +17,8 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from helpers.logger import get_styled_logger
-from src.research.track_evaluation.transformer import UPLOAD_COLUMNS, build_track_template, coerce_and_clean
+from src.research.track_evaluation.extractor import read_raw, read_reviewed_template
+from src.research.track_evaluation.transformer import build_track_template, coerce_and_clean
 from src.research.track_evaluation.validator import validate_track_evaluation
 from src.research.track_evaluation.loader import (
     MERGE_KEYS,
@@ -52,9 +53,7 @@ def run_template(input_path: str) -> Path:
     logger.info("=" * 20 + " Start template mapping " + "=" * 20)
     logger.info("Input: %s", input_path)
 
-    data = pd.read_excel(input_path)
-    logger.info("Loaded %d rows", len(data))
-
+    data = read_raw(input_path)
     df_template = build_track_template(data)
 
     output_path = (
@@ -71,10 +70,7 @@ def _load_reviewed_template(input_path: str) -> pd.DataFrame:
     ใช้ร่วมกันทั้ง MSSQL และ BigQuery เพื่อให้สองปลายทางได้ข้อมูลชุดเดียวกัน
     validate ไม่ผ่าน → sys.exit(1) ไม่เขียนข้อมูลเข้าปลายทางใดๆ
     """
-    df = pd.read_excel(input_path, usecols=list(UPLOAD_COLUMNS))
-    logger.info("Loaded %d rows × %d columns", len(df), len(df.columns))
-
-    df = df.rename(columns=UPLOAD_COLUMNS)
+    df = read_reviewed_template(input_path)
     df = coerce_and_clean(df)
 
     if not validate_track_evaluation(df):

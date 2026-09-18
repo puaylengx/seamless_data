@@ -15,6 +15,7 @@
 | PD-7 | ลบ backup tags `backup/pre-rewrite/*` (17 tags, local เท่านั้น) | Project owner สั่งเอง | ⏳ **ครบกำหนด 2026-09-24** — ห้ามลบอัตโนมัติ | 2026-09-17 |
 | PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-9 | MSSQL research DB จริงอยู่ที่ไหน (G6 ส่วน MSSQL DDL) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — **บล็อก G6 ส่วน MSSQL** | 2026-09-18 |
+| PD-10 | fiscal_year จาก Excel ≠ derive จาก doc_date — จะ fail / ยึด doc_date / ยึด Excel (G15) | Domain Expert — Finance (หลังมีสถิติจาก log 2–3 รอบ) | ⏳ รอข้อมูลจริงก่อน แล้วรอคำตอบ | 2026-09-18 |
 
 ---
 
@@ -86,6 +87,14 @@
 - **ทำไมต้องถาม:** G6 ต้องบันทึก schema MSSQL ปัจจุบันเป็น `migrations/research/mssql/001_*.sql` (source of truth) — reverse-engineer จาก `INFORMATION_SCHEMA`/`sys.*` เท่านั้น (query เตรียมไว้แล้ว read-only, ดู PR #13) ทำไม่ได้จนกว่าจะต่อ instance ที่ถูกต้อง; และถ้าเป็นข้อ 2 แปลว่า `.env` ทุกเครื่องชี้ผิดที่ → กระทบ upload/reconcile ทั้งหมด
 - **สิ่งที่ตัดสินใจแล้ว:** **ห้าม start service/container เอง** แม้จะเจอวิธี — ถ้าเป็น DB จริงที่หายไปโดยไม่ตั้งใจ การ "แก้ให้" อาจทับสภาพที่ทีมอื่นตั้งใจปล่อยไว้ (Project owner 2026-09-18)
 - **ผลเมื่อได้คำตอบ:** รันสคริปต์ metadata dump เดิม → เขียน `001_*.sql` → ให้ Project owner ตรวจก่อน (ไม่ apply ที่ไหน)
+
+## PD-10 · fiscal_year / fiscal_month จาก Excel ไม่ตรงกับที่คำนวณจาก doc_date (G15)
+
+- **ถามใคร:** Domain Expert — Finance
+- **ถามอะไร:** เมื่อไฟล์ ERP ระบุ `fiscal_year`/`fiscal_month` ต่างจากที่นิยาม `helpers/fiscal.py` (ปีงบเริ่ม ต.ค.) คำนวณจาก `doc_date` ควร (1) **fail-fast** ไม่โหลด (2) **ยึด doc_date** คำนวณทับ หรือ (3) **ยึด Excel** เพราะฝ่ายการเงิน post ย้อนงวดโดยตั้งใจ
+- **ทำไมยังไม่ถาม/ยังไม่ทำ:** เป็น check ใหม่ ([PR #15](https://github.com/puaylengx/seamless_data/pull/15)) ยังไม่มีข้อมูลว่าไฟล์จริง mismatch บ่อยแค่ไหน → ตอนนี้ `ErpValidator` แค่ **WARNING** (`result["warnings"]`) ไม่ block เพื่อไม่ทำผิดซ้ำแบบ G3 ที่ fail-fast ก่อนรู้ scope
+- **ขั้นตอน:** รัน finance pipeline จริง 2–3 รอบ → รวมสถิติ mismatch (จำนวน/สัดส่วน/รูปแบบ เช่น กระจุกที่เดือนไหน) จาก log → นำไปถาม Finance พร้อมตัวเลข → ตัดสิน → เปลี่ยน validator ตามผล + decision log
+- **ผูกกับ:** G15 (tracker), G13 (DQ consistency), Metric Dictionary G12 (นิยามปีงบต้องอยู่ที่นั่นด้วย)
 
 ---
 

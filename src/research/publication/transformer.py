@@ -1,9 +1,14 @@
+import logging
 import re
 import calendar
 import numpy as np
 import pandas as pd
 
 from helpers.fiscal import fiscal_year
+
+logger = logging.getLogger(__name__)
+
+_EXCEL_ROW_OFFSET = 2  # header row 1, data starts at row 2
 
 _VALID_RANKS = [
     "Lecturer", "Assoc.Prof.", "Support Staff", "Asst.Prof.",
@@ -307,3 +312,110 @@ def get_extract_sdg_values(db_str) -> dict:
             result[f"sdg{n}"] = 1
 
     return result
+
+
+# ── template assembly (ย้ายมาจาก main.py — G11) ─────────────────────────────
+
+_DB_KEYS = _FLAG_COLUMNS + ["Field"]
+
+# ลำดับ column ของ draft template ที่ส่งให้ฝ่ายวิจัย review (ชื่อ snake_case ตาม DB ยกเว้น column ต้นทางที่คงไว้ให้ดู)
+TEMPLATE_COLUMN_ORDER = [
+    "rank", "group_rank", "description",
+    "Database (WoS, Scopus, TCI)",
+    "wos_with_jif_p90", "wos_with_jif", "wos_sc", "wos_ss", "wos_ah", "wos_es",
+    "scopus_sjr_10", "scopus_q1", "scopus_q2", "scopus_q3", "scopus_q4", "scopus_no_q",
+    "sense_abc", "eric", "math_sci_net", "pubmed", "jstor", "project_muse",
+    "other_inter", "tci_group1", "tci_group2", "national_journal", "field",
+    "division", "product_code", "firstname", "lastname", "title", "source",
+    "volume", "issue", "pages",
+    "publication_month", "publication_year", "publication_calendar_year",
+    "publication_budget_year", "effective_date", "national_international",
+] + [f"sdg{i}" for i in range(1, 18)]
+
+
+def _process_database(raw_data: pd.DataFrame) -> pd.DataFrame:
+    parsed_db = get_parse_database_data(raw_data.copy())
+    df = pd.DataFrame()
+    df["Database (WoS, Scopus, TCI)"] = raw_data["Database (WoS, Scopus, TCI)"]
+    for k in _DB_KEYS:
+        df[k] = parsed_db.get(k, None)
+    return df
+
+
+def _process_clean(raw_data: pd.DataFrame) -> pd.DataFrame:
+    df = pd.DataFrame()
+    df["rank"] = get_rank(raw_data)
+    df["group_rank"] = get_group_rank(raw_data)
+    df["publication_month"] = get_clean_publication_month(raw_data)
+    df["publication_year"] = get_clean_year(raw_data)
+    df["publication_calendar_year"] = get_clean_year(raw_data)
+    df["publication_budget_year"] = get_clean_budget_year(raw_data)
+    df["effective_date"] = get_format_effective_date(raw_data)
+    df["national_international"] = get_national_international(raw_data)
+
+    sdg_df = raw_data["SDGs Goal"].apply(
+        lambda x: pd.Series(get_extract_sdg_values(x) if pd.notna(x) else {})
+    )
+    return pd.concat([df, sdg_df], axis=1)
+
+
+def build_publication_template(raw_data: pd.DataFrame, rename_map: dict[str, str]) -> pd.DataFrame:
+    """
+    ไฟล์ต้นทาง (extractor.read_raw) → draft template ให้ฝ่ายวิจัย review (behavior เดิมของ main.run_template)
+    rename_map = loader._RENAME_MAP (ชื่อ flag เดิม → snake_case) — ส่งเข้ามาเพื่อไม่ให้ transformer import loader
+    """
+    db_data = _process_database(raw_data)
+    clean_data = _process_clean(raw_data)
+
+    template = pd.DataFrame({
+        "description": raw_data["Description"],
+        "division": raw_data["Division"],
+        "product_code": raw_data["Product Code"],
+        "firstname": raw_data["Firstname"],
+        "lastname": raw_data["Lastname"],
+        "title": raw_data["Title"],
+        "source": raw_data["Journal/Conference/Source"],
+        "volume": raw_data["Volume"] if "Volume" in raw_data.columns else None,
+        "issue": raw_data["Issue"] if "Issue" in raw_data.columns else None,
+        "pages": raw_data["Pages"] if "Pages" in raw_data.columns else None,
+    })
+
+    df_combined = pd.concat(
+        [template.reset_index(drop=True), db_data.reset_index(drop=True), clean_data.reset_index(drop=True)],
+        axis=1,
+    ).rename(columns=rename_map)
+
+    for col in TEMPLATE_COLUMN_ORDER:
+        if col not in df_combined.columns:
+            df_combined[col] = None
+    return df_combined[TEMPLATE_COLUMN_ORDER]
+
+
+# ── reviewed template → DB-ready (G11: mutation ย้ายมาจาก validator) ─────────
+
+def coerce_and_clean(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    template ที่ review แล้ว (ชื่อ column snake_case) → DataFrame ที่ validator ตรวจแบบ read-only ได้
+
+    เดิม validate_publication ทำ 2 อย่างนี้ **ใน validator** (mutate df ที่รับเข้ามา):
+      1. publication_month ที่ว่าง/นอก 1–12 → เติมจากเดือนของ effective_date (ถ้า parse ได้)
+      2. effective_date ถูก coerce เป็น datetime *เฉพาะเมื่อ* มี month ผิด (side effect ไม่สม่ำเสมอ)
+    ตอนนี้ (1) อยู่ที่นี่และทำทุกครั้ง; (2) ไม่ทำ — effective_date คงค่าเดิม (loader._prepare_df แปลงเป็น date เองอยู่แล้ว)
+    คืน DataFrame ใหม่ ไม่แก้ตัวที่รับเข้ามา
+    """
+    df = df.copy()
+    if "publication_month" in df.columns and "effective_date" in df.columns:
+        month = pd.to_numeric(df["publication_month"], errors="coerce")
+        bad = month.isna() | ~month.between(1, 12)
+        if bad.any():
+            eff = pd.to_datetime(df["effective_date"], errors="coerce")
+            fillable = bad & eff.notna()
+            rows = (df.index[bad] + _EXCEL_ROW_OFFSET).tolist()
+            logger.info(
+                "publication_month ไม่อยู่ใน 1–12 ที่ Excel rows: %s → เติมจาก effective_date ได้ %d/%d แถว",
+                rows, int(fillable.sum()), int(bad.sum()),
+            )
+            month = month.astype("Float64")
+            month[fillable] = eff[fillable].dt.month
+            df["publication_month"] = month
+    return df

@@ -1,6 +1,6 @@
 """
 Finance Master ETL
-extract → transform → load สำหรับ master tables ทั้งหมด
+extract → transform → validate → load สำหรับ master tables ทั้งหมด
 """
 import sys
 from pathlib import Path
@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from src.finance.extractor import MasterExtractor
-from src.finance.master import MasterTransformer, MasterLoader
+from src.finance.master import MasterLoader, MasterTransformer, MasterValidator
 
 # mapping: table_name → ชื่อไฟล์ Excel
 MASTER_FILES: dict[str, str] = {
@@ -50,7 +50,18 @@ def run(table_name: str = "all", mode: str = "replace") -> list[dict]:
         df = MasterTransformer(df).run()
         print(f"   columns   : {df.columns.tolist()}")
 
-        # 3. Load
+        # 3. Validate (G11) — key ว่าง/ซ้ำ หรือ column หาย → หยุดก่อนแตะ DB
+        check = MasterValidator(df, table_name=tbl).run()
+        for w in check["warnings"]:
+            print(f"   ⚠️  {w}")
+        if not check["passed"]:
+            print("   ❌ Validation failed:")
+            for e in check["errors"]:
+                print(f"      - {e}")
+            sys.exit(1)
+        print("   ✅ Validation passed")
+
+        # 4. Load
         result = loader.load(df, table_name=tbl, mode=mode)
         print(f"   ✅ inserted {result['rows_inserted']:,} rows → {tbl}")
 
