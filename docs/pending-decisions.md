@@ -14,6 +14,7 @@
 | PD-6 | dashboard tool + เจ้าของ access policy (G8, G12) | หัวหน้าทีม / ผู้ใช้ dashboard | ⏳ รอคำตอบ | 2026-09-17 |
 | PD-7 | ลบ backup tags `backup/pre-rewrite/*` (17 tags, local เท่านั้น) | Project owner สั่งเอง | ⏳ **ครบกำหนด 2026-09-24** — ห้ามลบอัตโนมัติ | 2026-09-17 |
 | PD-8 | Publication: Year suffix + รายการ rank ที่ถูกต้อง (G21) | Domain Expert — Research | ⏳ รอคำตอบ | 2026-09-17 |
+| PD-9 | MSSQL research DB จริงอยู่ที่ไหน (G6 ส่วน MSSQL DDL) | DevOps / คนตั้งค่า `.env` เดิม | ⏳ รอคำตอบ — **บล็อก G6 ส่วน MSSQL** | 2026-09-18 |
 
 ---
 
@@ -76,6 +77,16 @@
 - **ทำได้เลยโดยไม่รอ:** เพิ่ม range check ปี (เช่น 2000–2100) ใน validator เพื่อจับ `20233` — ไม่ขึ้นกับคำตอบ
 - **ผลเมื่อได้คำตอบ:** ปรับ `get_clean_year` (reject/strip) + เพิ่ม rank check ใน `validate_publication` + test ใน G21
 
+## PD-9 · MSSQL research DB จริงอยู่ที่ไหน (G6 — reverse-engineer schema `publications` / `track_evaluation`)
+
+- **ถามใคร:** DevOps เจ้าของ credential เดิม หรือคนที่ตั้งค่า `.env` ตอนแรก (ไม่ใช่ Project owner — ตอบเองไม่ได้)
+- **ถามอะไร:** `LOCAL_HOST=localhost` ใน `.env` ชี้ไปที่ MSSQL instance **บนเครื่องนี้** ซึ่งตอนนี้ **ไม่ได้รันอยู่** (ตรวจ 2026-09-18: port 1433 ไม่เปิด, ไม่มี docker container แม้ stopped, ไม่มี `sqlservr` process; มี `sqlcmd`/`mssql-tools18` ติดตั้งไว้) แต่มีหลักฐานว่าเคย upload ข้อมูลจริงเข้าไป (log `logs/research/*`) จึงไม่แน่ใจว่า
+  1. เป็น dev copy ที่ถูกลบ/ไม่ได้ start แล้ว → ต้องรู้วิธี start (image/volume ไหน) หรือ
+  2. ควรมี host จริงอื่นที่ทีมวิจัย query อยู่ → ต้องได้ host/port ที่ถูกต้องมาแทน `localhost`
+- **ทำไมต้องถาม:** G6 ต้องบันทึก schema MSSQL ปัจจุบันเป็น `migrations/research/mssql/001_*.sql` (source of truth) — reverse-engineer จาก `INFORMATION_SCHEMA`/`sys.*` เท่านั้น (query เตรียมไว้แล้ว read-only, ดู PR #13) ทำไม่ได้จนกว่าจะต่อ instance ที่ถูกต้อง; และถ้าเป็นข้อ 2 แปลว่า `.env` ทุกเครื่องชี้ผิดที่ → กระทบ upload/reconcile ทั้งหมด
+- **สิ่งที่ตัดสินใจแล้ว:** **ห้าม start service/container เอง** แม้จะเจอวิธี — ถ้าเป็น DB จริงที่หายไปโดยไม่ตั้งใจ การ "แก้ให้" อาจทับสภาพที่ทีมอื่นตั้งใจปล่อยไว้ (Project owner 2026-09-18)
+- **ผลเมื่อได้คำตอบ:** รันสคริปต์ metadata dump เดิม → เขียน `001_*.sql` → ให้ Project owner ตรวจก่อน (ไม่ apply ที่ไหน)
+
 ---
 
 ## ตัดสินภายในทีมแล้ว (ไม่ต้องรอนอกทีม) — เก็บไว้เป็น audit trail จนกว่าจะมี `docs/decisions/`
@@ -86,4 +97,5 @@
 | 2026-09-17 | `MasterLoader` default `mode="replace"` ต้อง opt-in `ALLOW_REPLACE` ด้วยหรือไม่ | ต้อง — `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag (README) | G2, PR #1 |
 | 2026-09-17 | guard `ALLOW_REPLACE` copy ต่อ module หรือรวม? | รวมเป็น `helpers/replace_guard.py` ตัวเดียว ทุก loader import ร่วม | G2, PR #1/#2 |
 | 2026-09-17 | trailer `Co-Authored-By: Claude` ใน 11 commit ที่ push แล้ว | rewrite ทั้งหมดครั้งเดียวด้วย filter-repo (16 SHA เปลี่ยน, tree เท่าเดิม) + force-with-lease; กฎถาวรอยู่ใน CLAUDE.md | PR #3, PR #4 |
+| 2026-09-18 | MSSQL ต่อไม่ได้ระหว่างทำ G6 — start local instance เองไหม | ไม่ — บันทึกเป็น PD-9 รอเจ้าของ infra | G6, PD-9 |
 | 2026-09-17 | zeal_data half ของ G2 อยู่ branch ไหน | `fix/phase0-zeal-replace-guard` base `feat/aditayathorn-zeal-data` (module ยังไม่อยู่บน main) | PR #2 |
