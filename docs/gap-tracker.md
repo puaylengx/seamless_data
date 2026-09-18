@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | Phase 0 | 3/3 (zeal half ของ G2 รอ PR #2) | — | — | — |
 | Phase 1 | 4/5 + G6 ส่วนที่ทำได้ ✅ #13 (G1 ✅ #6 · G4 ✅ #9 · G7 ✅ #10 · G16 ✅ #11) | — | 0 | G4 SoT (PD-4), G7 grants (PD-5), G6 MSSQL (PD-9) |
-| Phase 2 | 3/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16) | G5 (PR #17) | 4 | G5 erp key (PD-3) + status/dup (PD-11), G10 (Finance), G13 (Finance master file), G21 (PD-8), G15 policy (PD-10) |
+| Phase 2 | 3/8 (G14 ✅ #14 · G15 ✅ #15 · G11 ✅ #16) | G5 (PR #17) | 4 | G5 erp key (PD-3) + io_goods dedupe (PD-11b), G10 (Finance), G13 (Finance master file), G21 (PD-8), G15 policy (PD-10) |
 | Phase 3 | 1/7 (G20 ✅ PR #6) | — | 6 | G8 (PD-6), G12 (PD-6) |
 
 _อัปเดตล่าสุด: 2026-09-18 (G11 merged; G5 → PR #17)_
@@ -34,7 +34,7 @@ _อัปเดตล่าสุด: 2026-09-18 (G11 merged; G5 → PR #17)_
 
 ## Phase 2 — architecture / modeling (Sprint 3–4)
 
-- [~] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] PR #17 รอ review — `migrations/finance/003_add_master_primary_keys.sql`: ลบ exact duplicate (เทียบทุก column, `ctid`) แล้ว `ADD PRIMARY KEY` ทุก master (key = `MasterValidator.KEY_COLUMNS`, test ยืนยันตรงกัน) ใน transaction เดียว · ตรวจไฟล์ master จริง: key ไม่ซ้ำทุกตาราง **ยกเว้น io_goods 76530045 ซ้ำ exact** + status domain ต่างกันต่อตาราง → 🔒 PD-11 · `apply` จริงต้องผ่าน `--dry-run` บน staging ก่อน (DevOps) · 🔒 natural key `erp_2025` รอ PD-3
+- [~] **G5** 🟠 · Data quality (uniqueness), modeling · [QA + Architect] PR #17 — **PK master ✅** `003_add_master_primary_keys.sql` (ADD PRIMARY KEY อย่างเดียว key = `MasterValidator.KEY_COLUMNS`; ไม่ลบข้อมูล; พิสูจน์บน PG16 ชั่วคราวว่า DB ที่มี `76530045` ซ้ำ → `UniqueViolation` → rollback ทั้ง transaction, หลัง dedupe → PK 9 ตาราง + `schema_migrations` ครบ) · **dedupe io_goods 🔒 PD-11b** `004_dedupe_io_goods.sql` (`-- migrate: manual` → migrate.py ข้ามเสมอ, apply ได้เฉพาะ `--only`) · apply จริงต้อง `--dry-run` บน staging ก่อน (DevOps) · 🔒 natural key `erp_2025` รอ PD-3
 - [ ] **G10** 🟠 · Data modeling, layering · [Architect] align type `ic_strategy`/`mu_strategy` กับ master, `v_finance_*` view · 🔒 rename `erp_2025` → fact table รอ Finance ยืนยัน structure ข้ามปี
 - [ ] **G6** (ต่อ) · [Architect] BQ `track_evaluation` DDL ยังไม่มีใน repo (ไม่เคยมี) — ดึง schema จาก `client.get_table()` (metadata) ต้องขออนุญาตแยกเหมือน MSSQL · MSSQL 🔒 PD-9
 - [x] **G11** 🟡 · Data layering · [Pipeline + QA] [PR #16](https://github.com/puaylengx/seamless_data/pull/16) merged `74a174c` — publication: `extractor.py` (read_raw ตรวจ column บังคับ / read_reviewed_template), template assembly ย้ายจาก main → `transformer.build_publication_template`, **validator read-only** (month-fill ย้ายไป `coerce_and_clean` ตาม pattern G3; test G1 ที่ assert mutation เขียนใหม่ให้ตรวจผ่าน transformer) · track_evaluation: `extractor.py` · finance master: `MasterValidator` (key ว่าง/ซ้ำ/column หาย → fail, status แปลก → warning) เข้า main ก่อน load · **zeal_data ยังไม่แตะ** (module อยู่ branch zeal — ทำหลัง #2/#7 merge)
