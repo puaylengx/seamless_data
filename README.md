@@ -30,4 +30,4 @@ guard อยู่ที่ `helpers/replace_guard.py` ตัวเดียว 
 
 - dependency ทุกตัว **pin เวอร์ชันแน่นอน** ใน `requirements.txt` / `requirements-dev.txt` — เปลี่ยนเวอร์ชันต้องเป็น PR แยก + pytest + docker build ผ่าน
 - system deps ที่ pip ให้ไม่ได้: `mdb-tools` (zeal_data), `unixODBC` + **ODBC Driver 18 for SQL Server** (research MSSQL) — `Dockerfile` ติดตั้งครบ; บน macOS: `brew install mdbtools unixodbc` + Microsoft `msodbcsql18`
-- `docker build -t seamless_data .` ต้องผ่านใน CI ทุก PR (build เท่านั้น ไม่ run) · image ไม่มี credential — mount `.env` และ key ตอน run (`.dockerignore` กัน `.env`, `*.json`, `data/`, `logs/`)
+- `Dockerfile` เป็น multi-stage: **`runtime`** (default — ไม่มี pytest/ruff/`tests/`) และ **`test`** (`--target test` = runtime + `requirements-dev.txt` + `tests/`, CMD = pytest) · CI build ทั้งสอง target ทุก PR (build เท่านั้น ไม่ run) · image ไม่มี credential — mount `.env` และ key ตอน run (`.dockerignore` กัน `.env`, `*.json`, `data/`, `logs/`)
