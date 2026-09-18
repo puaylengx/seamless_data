@@ -2,71 +2,72 @@
 Finance Master ETL
 extract → transform → validate → load สำหรับ master tables ทั้งหมด
 """
+import logging
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
+from helpers.logger import get_styled_logger
 from src.finance.extractor import MasterExtractor
 from src.finance.master import MasterLoader, MasterTransformer, MasterValidator
+from src.finance.master.files import MASTER_FILES
 
-# mapping: table_name → ชื่อไฟล์ Excel
-MASTER_FILES: dict[str, str] = {
-    "master_cost_ctr":      "Master_CostCtr_20240605.xlsx",
-    "master_fund":          "Master_FUND_20221118.xlsx",
-    "master_gl":            "Master_GL_20230531.xlsx",
-    "master_io_goods":      "Master_IO_Goods_20230531.xlsx",
-    "master_io_activities": "Master_IO_Activity_20230531.xlsx",
-    "master_io_project":    "Master_IO_Project_20230531.xlsx",
-    "master_io_work":       "Master_IO_Work_20230531.xlsx",
-    "master_ic_strategy":   "Master_IC_Strategy_20230531.xlsx",
-    "master_mu_strategy":   "Master_MU_Strategy_20230531.xlsx",
-}
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+LOG_DIR = PROJECT_ROOT / "logs" / "finance"
 
+logger = get_styled_logger(
+    name=__name__,
+    log_dir=LOG_DIR,
+    log_filename=f"master_{datetime.now():%Y-%m-%d}.log",
+    log_level=logging.INFO,
+)
 
 def run(table_name: str = "all", mode: str = "replace") -> list[dict]:
+    started = time.monotonic()
     extractor = MasterExtractor()
     loader    = MasterLoader()
 
-    targets = (
-        {table_name: MASTER_FILES[table_name]}
-        if table_name != "all"
-        else MASTER_FILES
-    )
-
     if table_name != "all" and table_name not in MASTER_FILES:
-        print(f"❌ ไม่รู้จัก table '{table_name}'\nที่รองรับ: {list(MASTER_FILES)}")
+        logger.error("❌ ไม่รู้จัก table '%s' — ที่รองรับ: %s", table_name, list(MASTER_FILES))
         sys.exit(1)
+
+    targets = {table_name: MASTER_FILES[table_name]} if table_name != "all" else MASTER_FILES
+    logger.info("=" * 20 + " Finance Master (%s, %s) " + "=" * 20, table_name, mode)
 
     results = []
     for tbl, file_name in targets.items():
-        print(f"\n── {tbl} ──────────────────────────────────")
+        logger.info("── %s ──", tbl)
 
         # 1. Extract
         df = extractor.extract(table_name=tbl, file_path=file_name)
-        print(f"   extracted : {len(df):,} rows")
+        logger.info("   extracted : %s rows", f"{len(df):,}")
 
         # 2. Transform
         df = MasterTransformer(df).run()
-        print(f"   columns   : {df.columns.tolist()}")
+        logger.info("   columns   : %s", df.columns.tolist())
 
         # 3. Validate (G11) — key ว่าง/ซ้ำ หรือ column หาย → หยุดก่อนแตะ DB
         check = MasterValidator(df, table_name=tbl).run()
         for w in check["warnings"]:
-            print(f"   ⚠️  {w}")
+            logger.warning("   ⚠️  %s", w)
         if not check["passed"]:
-            print("   ❌ Validation failed:")
             for e in check["errors"]:
-                print(f"      - {e}")
+                logger.error("   ❌ %s", e)
+            logger.info("JOB SUMMARY job=finance.master status=validation_failed table=%s duration=%.1fs",
+                        tbl, time.monotonic() - started)
             sys.exit(1)
-        print("   ✅ Validation passed")
+        logger.info("   ✅ Validation passed")
 
         # 4. Load
         result = loader.load(df, table_name=tbl, mode=mode)
-        print(f"   ✅ inserted {result['rows_inserted']:,} rows → {tbl}")
-
+        logger.info("   ✅ inserted %s rows → %s", f"{result['rows_inserted']:,}", tbl)
         results.append(result)
 
+    logger.info("JOB SUMMARY job=finance.master status=ok mode=%s tables=%d rows_out=%d duration=%.1fs",
+                mode, len(results), sum(r["rows_inserted"] for r in results), time.monotonic() - started)
     return results
 
 

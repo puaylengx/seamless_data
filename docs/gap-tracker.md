@@ -48,7 +48,7 @@ _อัปเดตล่าสุด: 2026-09-18 (G13 merged; G21 → PR #20; F
 - [ ] **G12** 🟡 · Documentation · [BI] ✋ `docs/metric-dictionary.md` skeleton · 🔒 นิยาม metric จริง + refresh schedule รอ PD-6 (dashboard tool)
 - [ ] **G8** 🟠 · Security (RBAC/PII) · [Security + BI] ✋ data classification table (column → sensitivity) · 🔒 authorized views / policy tags รอ PD-6
 - [ ] **G17** 🟡 · Config management · [Pipeline] ✋ ลบ hardcoded infra fallback (`SSH_HOST`, `DB_NAME`), รวม connection เป็น `helpers/connect_db/{postgres,mssql,bigquery}.py`
-- [ ] **G18** 🟢 · Documentation · [PM + ทุกคน] ✋ README module map, `docs/decisions/` decision log (ย้ายตาราง "ตัดสินภายในทีมแล้ว" จาก pending-decisions มา), แทน `print()` ที่เหลือ ~30 จุด (ค้างจาก G9)
+- [~] **G18** 🟢 · Documentation · [PM + ทุกคน] PR #22 รอ review — README quick start + module map · `docs/decisions/` 10 ไฟล์ (ย้ายตาราง "ตัดสินภายในทีมแล้ว" + เพิ่มการตัดสินใจจาก G4/G5/G13/G15) · `print()` → logger ครบ (finance ERP/master, research usage) + บรรทัด `JOB SUMMARY` ท้ายทุก run (ค้างจาก G9) · แก้ side effect ที่พบระหว่างทาง: `MASTER_FILES` ย้ายไป `master/files.py` เพราะ import `master.main` แย่ง handler ของ `src` logger
 - [ ] **G19** 🟢 · Data modeling · [Architect] naming `master_io_activities` / `io_good_id` — ทำพร้อม G10 เท่านั้น
 - [ ] **G22** 🟢 · Security / CI · [DevOps] ✋ CI gitleaks (gitleaks-action บน pull_request) สแกนเฉพาะ commit ของ PR ไม่ใช่ full history — เพิ่ม scheduled workflow (เช่น weekly) รัน `gitleaks git --log-opts=--all` แยกจาก PR check (full-history scan ล่าสุดทำในเครื่อง 2026-09-17 = 0 leaks, PR #11)
 - [x] **G20** 🟢 · Testing · [DevOps] ทำพร้อม G1 ใน [PR #6](https://github.com/puaylengx/seamless_data/pull/6) — `pytestmark = integration`, deselect ผ่าน pyproject `addopts`

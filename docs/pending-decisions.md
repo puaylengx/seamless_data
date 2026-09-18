@@ -142,13 +142,6 @@
 
 ---
 
-## ตัดสินภายในทีมแล้ว (ไม่ต้องรอนอกทีม) — เก็บไว้เป็น audit trail จนกว่าจะมี `docs/decisions/`
+## ตัดสินภายในทีมแล้ว
 
-| วันที่ | เรื่อง | ผล | อ้างอิง |
-|---|---|---|---|
-| 2026-09-17 | non-numeric `score`/`weight` ใน track_evaluation → NULL + WARNING หรือ fail? | คงเป็น WARNING (behavior เดิมของ path MSSQL) ผูกกับ PD-2 | G3, PR #1 |
-| 2026-09-17 | `MasterLoader` default `mode="replace"` ต้อง opt-in `ALLOW_REPLACE` ด้วยหรือไม่ | ต้อง — `master/main.py` error โดยตั้งใจถ้าไม่ตั้ง flag (README) | G2, PR #1 |
-| 2026-09-17 | guard `ALLOW_REPLACE` copy ต่อ module หรือรวม? | รวมเป็น `helpers/replace_guard.py` ตัวเดียว ทุก loader import ร่วม | G2, PR #1/#2 |
-| 2026-09-17 | trailer `Co-Authored-By: Claude` ใน 11 commit ที่ push แล้ว | rewrite ทั้งหมดครั้งเดียวด้วย filter-repo (16 SHA เปลี่ยน, tree เท่าเดิม) + force-with-lease; กฎถาวรอยู่ใน CLAUDE.md | PR #3, PR #4 |
-| 2026-09-18 | MSSQL ต่อไม่ได้ระหว่างทำ G6 — start local instance เองไหม | ไม่ — บันทึกเป็น PD-9 รอเจ้าของ infra | G6, PD-9 |
-| 2026-09-17 | zeal_data half ของ G2 อยู่ branch ไหน | `fix/phase0-zeal-replace-guard` base `feat/aditayathorn-zeal-data` (module ยังไม่อยู่บน main) | PR #2 |
+ย้ายไป [`docs/decisions/`](decisions/README.md) (หนึ่งไฟล์ต่อหนึ่งการตัดสินใจ — G18) · เมื่อ PD ข้อใดได้คำตอบ ให้สร้างไฟล์ใหม่ที่นั่นแล้วลบแถวจากตารางด้านบน

@@ -191,10 +191,10 @@ _COMMANDS = {
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         cmds = " | ".join(_COMMANDS)
-        print(f"Usage: python main.py <{cmds}> <input_excel_path>")
+        logger.error("Usage: python main.py <%s> <input_excel_path>", cmds)
         sys.exit(1)
     cmd, path = sys.argv[1], sys.argv[2]
     if cmd not in _COMMANDS:
-        print(f"Unknown command: '{cmd}'. Available: {list(_COMMANDS)}")
+        logger.error("Unknown command: '%s'. Available: %s", cmd, list(_COMMANDS))
         sys.exit(1)
     _COMMANDS[cmd](path)
