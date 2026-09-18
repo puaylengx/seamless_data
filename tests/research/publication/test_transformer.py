@@ -199,6 +199,24 @@ def test_coerce_fills_bad_month_from_effective_date_only_when_parseable():
     print("✅ coerce_and_clean: เติม month จาก effective_date เฉพาะที่ parse ได้")
 
 
+def test_coerce_never_overwrites_a_valid_month_even_if_effective_date_disagrees():
+    """คำถาม review PR #16: "เติมทุกรอบ" = ตรวจทุกรอบ แต่เติมเฉพาะแถวที่ month ผิด —
+    month 1–12 ที่ถูกอยู่แล้วต้องคงเดิมทุกค่า แม้ effective_date จะชี้เดือนอื่น"""
+    months = list(range(1, 13))
+    conflicting = [f"2024-{((m % 12) + 1):02d}-15" for m in months]        # เดือนถัดไปเสมอ ≠ month
+    df = pd.DataFrame({"publication_month": months, "effective_date": conflicting})
+    out = coerce_and_clean(df)
+    assert out["publication_month"].tolist() == months
+    assert out["effective_date"].tolist() == conflicting
+    print("✅ month ถูกอยู่แล้ว + effective_date คนละเดือน → ไม่ถูกทับ (ทั้ง 12 เดือน)")
+
+
+def test_coerce_frame_with_no_bad_month_is_returned_unchanged():
+    # เทียบกับ behavior เดิม: เมื่อไม่มี month ผิดเลย validator เดิมไม่แตะอะไร — ตอนนี้ก็ต้องเหมือนกันทั้ง frame
+    df = pd.DataFrame({"publication_month": [3, 12], "effective_date": ["2024-01-01", "garbage"], "title": ["a", "b"]})
+    pd.testing.assert_frame_equal(coerce_and_clean(df), df)
+
+
 def test_coerce_does_not_mutate_and_skips_when_columns_missing():
     df = pd.DataFrame({"publication_month": [13], "effective_date": ["2024-03-31"]})
     snap = df.copy(deep=True)
